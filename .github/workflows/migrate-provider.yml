@@ -20,10 +20,20 @@ jobs:
           repository: ${{ env.PROVIDER_REPO }}
           token: ${{ secrets.GH_COMMENT_TOKEN }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: 1.13.3
+          cli_config_credentials_token: ${{ secrets.TF_CLOUD_TOKEN }}
+          terraform_wrapper: false
+
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "20"
+
+      - name: Setup Copywrite tool
+        uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3
 
       - name: Install dependencies
         run: yarn install
@@ -53,6 +63,9 @@ jobs:
           yarn fetch
           # Fix readme (requires src/version.json to be populated)
           npx projen
+
+      - name: Add headers using Copywrite tool
+        run: copywrite headers
 
       - name: Build and verify
         run: |
@@ -106,7 +119,6 @@ jobs:
           webhook-type: webhook-trigger
           payload: |
             {
-              "text": "❌ Migration failed for provider: ${{ inputs.provider }}",
               "provider_name": "${{ inputs.provider }}",
               "run_url": "https://github.com/cdktn-io/cdktn-repository-manager/actions/runs/${{ github.run_id }}"
             }
