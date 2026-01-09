@@ -4,14 +4,6 @@
 >
 > [OCF](https://the-ocf.org/) - [github.com/open-constructs](https://github.com/open-constructs) has stepped up to fork under the new name of [CDK Terrain - cdktn.io](https://cdktn.io)
 
-Q: Will CDKTF continue to support new versions of Terraform or providers?
-
-A: To use new versions of Terraform and provider features, use the forked: `cdktn` and `cdktn-cli` packages. These packages will continue to be updated to support new versions of Terraform and providers.
-
-Q: Is CDKTF still being developed?
-
-## A: HashiCorp, an IBM Company, will no longer maintain or develop the project after December 10, 2025. This is a maintained fork of the original CDKTF project.
-
 # repository-manager
 
 ## About
