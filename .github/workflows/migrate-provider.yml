@@ -99,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
 
       - name: Send failures to Slack
-        if: ${{ failure() && !cancelled() && secrets.FAILURE_SLACK_WEBHOOK_URL != '' }}
+        if: ${{ failure() && !cancelled() }}
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           webhook: ${{ secrets.FAILURE_SLACK_WEBHOOK_URL }}
