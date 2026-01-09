@@ -47,6 +47,7 @@ jobs:
 
       - name: Regenerate with projen
         run: |
+          unset CI
           npx projen
           yarn install --check-files
           yarn fetch
@@ -98,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
 
       - name: Send failures to Slack
-        if: ${{ failure() && !cancelled() }}
+        if: ${{ failure() && !cancelled() && secrets.FAILURE_SLACK_WEBHOOK_URL != '' }}
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           webhook: ${{ secrets.FAILURE_SLACK_WEBHOOK_URL }}
