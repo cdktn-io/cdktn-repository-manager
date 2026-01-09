@@ -12,8 +12,7 @@ env:
 jobs:
   update_provider:
     name: Create a PR in the provider repo to mark it as deprecated
-    # runs-on: ubuntu-latest
-    runs-on: custom-linux-medium
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -56,8 +55,8 @@ jobs:
             `--force-local` flag enabled. For more information, check out our documentation on [generating provider bindings manually](https://cdk.tf/imports).
           labels: automated,auto-approve,automerge
           token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
-          committer: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
           signoff: true
           delete-branch: true
       - name: Get NuGet package name
@@ -119,8 +118,8 @@ jobs:
             highly recommended that you complete the above steps in short succession.
           labels: automated,do-not-merge
           token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
-          committer: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
           signoff: true
           delete-branch: true
           draft: true

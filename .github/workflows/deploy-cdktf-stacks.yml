@@ -54,7 +54,7 @@ jobs:
           payload: |
             {
               "provider_name": "stack deploy ${{ matrix.stack }}",
-              "run_url": "https://github.com/cdktf/cdktf-repository-manager/actions/runs/${{ github.run_id }}"
+              "run_url": "https://github.com/cdktn-io/cdktn-repository-manager/actions/runs/${{ github.run_id }}"
             }
 
   upgrade:

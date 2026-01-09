@@ -1,2 +1,16 @@
 {
+  "archive": "hashicorp/archive@~> 2.2",
+  "aws": "hashicorp/aws@~> 6.0",
+  "cloudinit": "hashicorp/cloudinit@~> 2.2",
+  "docker": "kreuzwerker/docker@~> 3.0",
+  "dns": "hashicorp/dns@~> 3.2",
+  "external": "hashicorp/external@~> 2.1",
+  "github": "integrations/github@~> 6.0",
+  "http": "hashicorp/http@~> 3.1",
+  "kubernetes": "hashicorp/kubernetes@~> 2.0",
+  "local": "hashicorp/local@~> 2.1",
+  "null": "hashicorp/null@~> 3.0",
+  "random": "hashicorp/random@~> 3.1",
+  "time": "hashicorp/time@~> 0.7",
+  "tls": "hashicorp/tls@~> 4.0"
 }

@@ -6,7 +6,34 @@
         "workspaceName": "prebuilt-providers"
       },
       "providers": [
+        "archive",
+        "aws",
+        "cloudinit",
+        "docker",
+        "external",
+        "github",
+        "kubernetes",
+        "local",
+        "null",
+        "random",
+        "time",
+        "tls"
       ]
+    },
+    "repos-official-new": {
+      "backend": {
+        "workspaceName": "prebuilt-providers-official-new"
+      },
+      "providers": [
+        "dns",
+        "http"
+      ]
+    },
+    "repos-partners": {
+      "backend": {
+        "workspaceName": "prebuilt-providers-partners"
+      },
+      "providers": []
     }
   }
 }

@@ -1,0 +1,5 @@
+[tools]
+jq = "latest"
+node = "24"
+opentofu = "latest"
+terraform = "1.13.3"

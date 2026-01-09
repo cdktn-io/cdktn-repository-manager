@@ -11,3 +11,4 @@ yalc.lock
 !projenrc.template.js
 !.github/lib/*.js
 !*.config.js
+./cdktn-provider-random/

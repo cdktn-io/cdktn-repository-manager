@@ -1,0 +1,111 @@
+name: Migrate Provider to CDKTN Scope
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'Provider name (key from provider.json, e.g., "aws", "google", "random")'
+        required: true
+        type: string
+
+jobs:
+  migrate-provider-repo:
+    name: Migrate provider to @cdktn scope
+    runs-on: ubuntu-latest
+    env:
+      PROVIDER_REPO: ${{ format('cdktn-io/cdktn-provider-{0}', inputs.provider) }}
+    steps:
+      - name: Checkout provider repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: ${{ env.PROVIDER_REPO }}
+          token: ${{ secrets.GH_COMMENT_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Migrate to @cdktn scope
+        run: |
+          # Update require statement, project type, isDeprecated flag
+          sed -i 's|@cdktf/provider-project|@cdktn/provider-project|g' .projenrc.js
+          sed -i 's/CdktfProviderProject/CdktnProviderProject/g' .projenrc.js
+          sed -i "s/isDeprecated: true,/isDeprecated: false,/" .projenrc.js
+
+          # Verify changes were made
+          grep -q "@cdktn/provider-project" .projenrc.js || {
+            echo "Error: Migration failed - @cdktn/provider-project not found"
+            exit 1
+          }
+
+      - name: Upgrade to latest @cdktn/provider-project
+        run: |
+          yarn add --dev @cdktn/provider-project@latest
+
+      - name: Regenerate with projen
+        run: |
+          npx projen
+          yarn install --check-files
+          yarn fetch
+          # Fix readme (requires src/version.json to be populated)
+          npx projen
+
+      - name: Build and verify
+        run: |
+          yarn build
+
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
+        with:
+          branch: auto/migrate-to-cdktn-scope
+          base: main
+          commit-message: "feat: migrate to @cdktn scope"
+          title: "feat: migrate to @cdktn scope"
+          body: |
+            ## Summary
+
+            This PR migrates the provider from `@cdktf/provider-project` to `@cdktn/provider-project`.
+
+            ## Changes
+
+            - Updated require statement in .projenrc.js
+            - Updated Projen Project type name (CdktfProviderProject → CdktnProviderProject)
+            - Updated devDeps to use @cdktn/provider-project@latest
+            - Reverted provider deprecation flag (isDeprecated: false)
+            - Regenerated all files with projen
+            - Verified build succeeds
+
+            ## Migration Context
+
+            As part of the CDKTF → CDKTN migration following HashiCorp's sunset of the CDKTF project (December 10, 2025), all provider bindings are being republished under the `@cdktn` npm scope.
+          labels: |
+            automerge
+            auto-approve
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          delete-branch: true
+          token: ${{ secrets.GH_COMMENT_TOKEN }}
+
+      - name: Enable auto-merge
+        if: steps.cpr.outputs.pull-request-number != ''
+        run: |
+          gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
+
+      - name: Send failures to Slack
+        if: ${{ failure() && !cancelled() }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.FAILURE_SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "text": "❌ Migration failed for provider: ${{ inputs.provider }}",
+              "provider_name": "${{ inputs.provider }}",
+              "run_url": "https://github.com/cdktn-io/cdktn-repository-manager/actions/runs/${{ github.run_id }}"
+            }

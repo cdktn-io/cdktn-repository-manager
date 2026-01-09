@@ -67,7 +67,7 @@ function getShardedStackProviders(name: string): Record<string, string> {
   );
 }
 
-class TerraformCdkProviderStack extends TerraformStack {
+class CdkTerrainProviderStack extends TerraformStack {
   constructor(scope: Construct, name: string, isPrimaryStack: boolean) {
     super(scope, name);
 
@@ -75,17 +75,18 @@ class TerraformCdkProviderStack extends TerraformStack {
     this.validateProviderNames(providers);
 
     const githubProvider = new GithubProvider(this, "github-provider-cdktf", {
-      owner: "cdktf",
-      alias: "cdktf",
+      owner: "cdktn-io",
+      alias: "cdktn",
     });
 
-    const githubTeam = new DataGithubTeam(this, "cdktf-team-cdktf", {
-      slug: "tf-cdk-team",
+    const githubTeam = new DataGithubTeam(this, "cdktn-team-cdk-terrain", {
+      slug: "team-cdk-terrain",
       provider: githubProvider,
     });
 
+    // TODO: Set up remote backend (S3?)
     new RemoteBackend(this, {
-      organization: "cdktf-team",
+      organization: "cdk-terrain",
       workspaces: {
         name: shardedStacks.stacks[name].backend.workspaceName,
       },
@@ -113,7 +114,8 @@ class TerraformCdkProviderStack extends TerraformStack {
     }
 
     const providerRepos: GitUrls[] = Object.keys(providers).map((provider) => {
-      const repo = new GithubRepository(this, `cdktf-provider-${provider}`, {
+      const repo = new GithubRepository(this, `cdktn-provider-${provider}`, {
+        // TODO: Rename once cdktn core has been published
         description: `Prebuilt Terraform CDK (cdktf) provider for ${provider}.`,
         topics: [...GithubRepository.defaultTopics, provider],
         team: githubTeam,
@@ -132,7 +134,8 @@ class TerraformCdkProviderStack extends TerraformStack {
       });
 
       // repo to publish go packages to
-      new GithubRepository(this, `cdktf-provider-${provider}-go`, {
+      new GithubRepository(this, `cdktn-provider-${provider}-go`, {
+        // TODO: Rename once cdktn core has been published
         description: `CDK for Terraform Go provider bindings for ${provider}.`,
         topics: [...GithubRepository.defaultTopics, provider],
         team: githubTeam,
@@ -163,7 +166,7 @@ class TerraformCdkProviderStack extends TerraformStack {
   ) {
     const templateRepository = new GithubRepository(
       this,
-      "cdktf-provider-project",
+      "cdktn-provider-project",
       {
         team: githubTeam,
         webhookUrl: slackWebhook.stringValue,
@@ -186,11 +189,12 @@ class TerraformCdkProviderStack extends TerraformStack {
     githubTeam: DataGithubTeam,
   ) {
     const selfTokens = [
+      // TODO: Remote Backend credentials (S3)
       new SecretFromVariable(this, "tf-cloud-token"),
       new SecretFromVariable(this, "gh-comment-token"),
     ];
 
-    const self = new GithubRepository(this, "cdktf-repository-manager", {
+    const self = new GithubRepository(this, "cdktn-repository-manager", {
       team: githubTeam,
       webhookUrl: slackWebhook.stringValue,
       provider: githubProvider,
@@ -250,17 +254,18 @@ class CustomConstructsStack extends TerraformStack {
   ) {
     super(scope, name);
     const githubProvider = new GithubProvider(this, "github-provider-cdktf", {
-      owner: "cdktf",
-      alias: "cdktf",
+      owner: "cdktn-io",
+      alias: "cdktn",
     });
 
     const githubTeam = new DataGithubTeam(this, "cdktf-team-cdktf", {
-      slug: "tf-cdk-team",
+      slug: "team-cdk-terrain",
       provider: githubProvider,
     });
 
+    // TODO: Set up remote backend (S3?)
     new RemoteBackend(this, {
-      organization: "cdktf-team",
+      organization: "cdk-terrain",
       workspaces: {
         name: "custom-constructs",
       },
@@ -305,17 +310,19 @@ class CustomConstructsStack extends TerraformStack {
       if (languages.includes("python")) {
         secrets.forPython(repo.resource, githubProvider);
       }
-      if (languages.includes("csharp")) {
-        secrets.forCsharp(repo.resource, githubProvider);
-      }
-      if (languages.includes("java")) {
-        secrets.forJava(repo.resource, githubProvider);
-      }
+      // TODO: Re-enable NuGet and Maven
+      // if (languages.includes("csharp")) {
+      //   secrets.forCsharp(repo.resource, githubProvider);
+      // }
+      // if (languages.includes("java")) {
+      //   secrets.forJava(repo.resource, githubProvider);
+      // }
       if (languages.includes("go")) {
         secrets.forGo(repo.resource, githubProvider);
 
         // repo to publish go packages to
         new GithubRepository(this, `${repoName}-go`, {
+          // TODO: Rename when cdktn core is published
           description: `CDK for Terraform Go bindings for ${repoName}.`,
           topics,
           team: githubTeam,
@@ -375,7 +382,7 @@ if (!stackNames.includes(primaryStackName)) {
 }
 
 stackNames.forEach((stackName) => {
-  const providerStack = new TerraformCdkProviderStack(
+  const providerStack = new CdkTerrainProviderStack(
     app,
     stackName,
     primaryStackName === stackName,
@@ -383,6 +390,6 @@ stackNames.forEach((stackName) => {
   Aspects.of(providerStack).add(new MigrateIds());
 });
 
-const customConstructs = new CustomConstructsStack(app, "custom-constructs", []);
+new CustomConstructsStack(app, "custom-constructs", []);
 
 app.synth();

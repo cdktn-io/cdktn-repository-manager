@@ -56,8 +56,8 @@ jobs:
             This PR upgrades the version of Terraform used by this project's `diff` and `deploy` workflows to `${{ steps.latest_version.outputs.value }}`.
           labels: auto-approve,automerge,dependencies
           token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
-          committer: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
           signoff: true
           delete-branch: true
       - name: Create pull request for a new minor version
@@ -80,8 +80,8 @@ jobs:
             - Rerun the checks and carefully inspect the diff output before merging this PR.
           labels: automated,dependencies
           token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
-          committer: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
           signoff: true
           delete-branch: true
           draft: true

@@ -61,10 +61,10 @@ jobs:
       - name: Upgrade provider project
         run: |
           unset CI
-          git config user.name github-team-tf-cdk
-          git config user.email github-team-tf-cdk@hashicorp.com
+          git config user.name github-team-cdk-terrain
+          git config user.email github-team-cdk-terrain@cdktn.io
           git checkout -b foo-bar-${{ github.run_number }}
-          yarn add --dev @cdktf/provider-project@latest
+          yarn add --dev @cdktn/provider-project@latest
           npx projen
           yarn install --check-files
           yarn fetch
@@ -131,5 +131,5 @@ jobs:
           payload: |
             {
               "provider_name": "${{ matrix.provider }}",
-              "run_url": "https://github.com/cdktf/cdktf-repository-manager/actions/runs/${{ github.run_id }}"
+              "run_url": "https://github.com/cdktn-io/cdktn-repository-manager/actions/runs/${{ github.run_id }}"
             }

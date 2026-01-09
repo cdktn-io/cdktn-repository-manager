@@ -58,7 +58,7 @@ jobs:
             For future reference: the reason why we're not using Dependabot for this is because this repo has a tendency to run into rate limits, and Dependabot produces so many PRs and workflow runs that it'd be likely to hit those limits quickly.
           labels: automerge,auto-approve,dependencies
           token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
-          committer: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
           signoff: true
           delete-branch: true

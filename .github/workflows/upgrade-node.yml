@@ -106,7 +106,7 @@ jobs:
           body: This PR increases the minimum supported Node.js version to `${{ needs.version.outputs.latest }}` from `${{ needs.version.outputs.current }}` because the latter is less than 30 days away from EOL.
           labels: automerge,automated,security
           token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
-          committer: team-tf-cdk <github-team-tf-cdk@hashicorp.com>
+          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
           signoff: true
           delete-branch: true

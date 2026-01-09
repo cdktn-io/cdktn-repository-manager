@@ -68,14 +68,15 @@ export class PublishingSecretSet extends Construct {
     this.secrets = [
       "gh-token",
       "npm-token",
-      "nuget-api-key",
       "twine-username",
       "twine-password",
-      "maven-username", // Use the user token from https://hashicorp.oss.sonatype.org/#profile;User%20Token (saved in 1Password)
-      "maven-password", // Use the user token password (same as above)
-      "maven-gpg-private-key",
-      "maven-gpg-private-key-passphrase",
-      "maven-staging-profile-id",
+      // TODO: Re-enable NuGet & Maven
+      // "nuget-api-key",
+      // "maven-username", // Set up Maven Central and store credentials in BitWarden
+      // "maven-password", // Use the user token password (same as above)
+      // "maven-gpg-private-key",
+      // "maven-gpg-private-key-passphrase",
+      // "maven-staging-profile-id",
     ].map((name) => new SecretFromVariable(this, name));
 
     const npmSecret = this.secrets.find((s) => s.name === "npm-token");
@@ -129,19 +130,19 @@ export class PublishingSecretSet extends Construct {
     this.forPrefixedSecrets(repository, ghProvider, "twine-");
   }
 
-  public forCsharp(
-    repository: Repository | DataGithubRepository,
-    ghProvider: GithubProvider,
-  ) {
-    this.forPrefixedSecrets(repository, ghProvider, "nuget-");
-  }
+  // public forCsharp(
+  //   repository: Repository | DataGithubRepository,
+  //   ghProvider: GithubProvider,
+  // ) {
+  //   this.forPrefixedSecrets(repository, ghProvider, "nuget-");
+  // }
 
-  public forJava(
-    repository: Repository | DataGithubRepository,
-    ghProvider: GithubProvider,
-  ) {
-    this.forPrefixedSecrets(repository, ghProvider, "maven-");
-  }
+  // public forJava(
+  //   repository: Repository | DataGithubRepository,
+  //   ghProvider: GithubProvider,
+  // ) {
+  //   this.forPrefixedSecrets(repository, ghProvider, "maven-");
+  // }
 
   public forGo(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

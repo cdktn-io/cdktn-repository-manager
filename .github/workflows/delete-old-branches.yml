@@ -31,8 +31,8 @@ jobs:
           fetch-depth: 0
       - name: Set git identity
         run: |-
-          git config user.name "team-tf-cdk"
-          git config user.email "github-team-tf-cdk@hashicorp.com"
+          git config user.name "team-cdk-terrain"
+          git config user.email "github-team-cdk-terrain@cdktn.io"
       - name: Delete old branches from previous repo-manager runs
         run: git branch -r | egrep -o "upgrade-provider-project.*" | xargs -n 1 git push origin --delete
         continue-on-error: true # don't fail the run if these branches never existed

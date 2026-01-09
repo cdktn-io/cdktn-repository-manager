@@ -16,9 +16,9 @@ jobs:
         with:
           issue-comment: >
             I'm going to lock this issue because it has been closed for at least 30 days. This helps our maintainers find and focus on the active issues.
-            If you've found a problem that seems similar to this, please [open a new issue](https://github.com/cdktf/cdktf-repository-manager/issues/new) so we can investigate further.
+            If you've found a problem that seems similar to this, please [open a new issue](https://github.com/cdktn-io/cdktn-repository-manager/issues/new) so we can investigate further.
           issue-inactive-days: 30
           pr-comment: >
             I'm going to lock this pull request because it has been closed for at least 30 days. This helps our maintainers find and focus on the active issues.
-            If you've found a problem that seems related to this change, please [open a new issue](https://github.com/cdktf/cdktf-repository-manager/issues/new) so we can investigate further.
+            If you've found a problem that seems related to this change, please [open a new issue](https://github.com/cdktn-io/cdktn-repository-manager/issues/new) so we can investigate further.
           pr-inactive-days: 30

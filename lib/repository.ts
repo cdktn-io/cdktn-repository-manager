@@ -166,7 +166,7 @@ export class GithubRepository extends Construct {
       ...config,
       repository: this.resource,
     });
-    
+
     if (!name.endsWith("-go")) {
       new RepositoryDependabotSecurityUpdates(this, "dependabot-security", {
         provider,
@@ -203,7 +203,7 @@ export class GithubRepositoryFromExistingRepository extends Construct {
       ...config,
       repository: this.resource,
     });
-    
+
     if (!name.endsWith("-go")) {
       new RepositoryDependabotSecurityUpdates(this, "dependabot-security", {
         provider: config.provider,
