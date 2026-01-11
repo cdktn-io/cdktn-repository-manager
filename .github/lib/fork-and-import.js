@@ -206,6 +206,95 @@ async function forkRepository(sourceRepoName, targetRepoName) {
 }
 
 /**
+ * Fix team names and email addresses in workflow files after forking
+ * @param {string} repoName - The repository name (e.g., "cdktn-provider-http")
+ */
+async function fixTeamNames(repoName) {
+  const OLD_TEAM = 'team-tf-cdk';
+  const NEW_TEAM = 'team-cdk-terrain';
+  const OLD_EMAIL = 'github-team-tf-cdk@hashicorp.com';
+  const NEW_EMAIL = 'github-team-cdk-terrain@cdktn.io';
+
+  try {
+    console.log(`   🔧 Fixing team references...`);
+
+    // Create temp directory
+    const tempDir = execSync('mktemp -d').toString().trim();
+    const originalDir = process.cwd();
+
+    try {
+      // Clone the forked repo
+      process.chdir(tempDir);
+      execSync(`gh repo clone cdktn-io/${repoName} . --quiet`, { stdio: 'pipe' });
+      let filesChanged = 0;
+
+      // update CODEOWNERS (skip on any error)
+      const codeOwnersFile = '.github/CODEOWNERS'
+      try {
+        const content = fs.readFileSync(codeOwnersFile, 'utf8');
+        let newContent = content.replaceAll('@cdktf/tf-cdk-team', '@cdktn-io/team-cdk-terrain');
+        fs.writeFileSync(codeOwnersFile, newContent);
+        filesChanged++;
+        console.log(`   ✅  Updated CODEOWNERS`);
+      } catch (err) {
+        console.log(`   ⏭️  Skipped CODEOWNERS`);
+      }
+
+      // Check if any workflow files need updating
+      const workflowFiles = execSync('find .github/workflows -name "*.yml" 2>/dev/null || true')
+        .toString()
+        .trim()
+        .split('\n')
+        .filter(f => f);
+
+      if (workflowFiles.length === 0) {
+        console.log(`   ⏭️  No workflow files to update`);
+        return;
+      }
+
+      for (const file of workflowFiles) {
+        try {
+          const content = fs.readFileSync(file, 'utf8');
+          if (content.includes(OLD_TEAM) || content.includes(OLD_EMAIL)) {
+            let newContent = content
+              .replaceAll(OLD_TEAM, NEW_TEAM)
+              .replaceAll(OLD_EMAIL, NEW_EMAIL);
+
+            fs.writeFileSync(file, newContent);
+            filesChanged++;
+          }
+        } catch (err) {
+          // Skip files we can't read/write
+        }
+      }
+
+      if (filesChanged === 0) {
+        console.log(`   ⏭️  No changes needed`);
+        return;
+      }
+
+      console.log(`   ✓ Updated ${filesChanged} workflow files`);
+
+      // Commit and push
+      execSync(`git config user.name "${NEW_TEAM}"`, { stdio: 'pipe' });
+      execSync(`git config user.email "${NEW_EMAIL}"`, { stdio: 'pipe' });
+      execSync('git add .github/workflows/*.yml', { stdio: 'pipe' });
+      execSync(`git commit -m "fix: update team references from ${OLD_TEAM} to ${NEW_TEAM}" --quiet`, { stdio: 'pipe' });
+      execSync('git push origin main --quiet', { stdio: 'pipe' });
+
+      console.log(`   ✅ Pushed team reference fixes to main`);
+    } finally {
+      // Cleanup
+      process.chdir(originalDir);
+      execSync(`rm -rf ${tempDir}`, { stdio: 'pipe' });
+    }
+  } catch (err) {
+    console.error(`   ⚠️  Failed to fix team names: ${err.message}`);
+    // Don't fail the whole process, team names can be fixed later
+  }
+}
+
+/**
  * Generate Terraform target flags for filtered repositories
  * Scans all resource types in cdk.tf.json and finds resources matching filtered repo names
  * @param {Object} cdkTfJson - The parsed cdk.tf.json content
@@ -374,6 +463,9 @@ async function main() {
 
         try {
           await forkRepository(repo.sourceName, repo.name);
+
+          // Fix team names in workflow files (no branch protection yet!)
+          await fixTeamNames(repo.name);
 
           // Add delay between forks to avoid rate limiting
           if (i < toFork.length - 1) {

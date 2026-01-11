@@ -67,6 +67,9 @@ jobs:
       - name: Add headers using Copywrite tool
         run: copywrite headers
 
+      - name: Reset the version in package.json
+        run: npm pkg set version="0.0.0"
+
       - name: Build and verify
         run: |
           yarn build
