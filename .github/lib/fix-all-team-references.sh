@@ -10,9 +10,11 @@ set -e
 
 ORG="cdktn-io"
 OLD_TEAM="team-tf-cdk"
-NEW_TEAM="team-cdk-terrain"
+NEW_TEAM="team-cdk-terrain[bot]"
 OLD_EMAIL="github-team-tf-cdk@hashicorp.com"
-NEW_EMAIL="github-team-cdk-terrain@cdktn.io"
+# gh api /users/${NEW_TEAM} --jq .id // HARDCODED FOR NOW
+APP_USER_ID='254218809'
+NEW_EMAIL="${APP_USER_ID}-${NEW_TEAM}@users.noreply.github.com";
 BRANCH="main"
 
 # Colors

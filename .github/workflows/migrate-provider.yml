@@ -82,12 +82,13 @@ jobs:
       - name: Add headers using Copywrite tool
         run: copywrite headers
 
-      - name: Reset the version in package.json
-        run: npm pkg set version="0.0.0"
-
       - name: Build and verify
         run: |
           yarn build
+
+        # yarn build bumps package.json, must reset after build!
+      - name: Reset the version in package.json
+        run: npm pkg set version="0.0.0"
 
       - name: Create Pull Request
         id: cpr
@@ -95,12 +96,12 @@ jobs:
         with:
           branch: auto/migrate-to-cdktn-scope
           base: main
-          commit-message: "feat: migrate to @cdktn scope"
-          title: "feat: migrate to @cdktn scope"
+          commit-message: "feat: migrate to cdktn-io scope"
+          title: "feat: migrate to cdktn-io scope"
           body: |
             ## Summary
 
-            This PR migrates the provider from `@cdktf/provider-project` to `@cdktn/provider-project`.
+            This PR migrates the provider from `@cdktf/provider-project` to `@cdktn/provider-project` for cdktn-io managed pre-built providers.
 
             ## Changes
 

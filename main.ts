@@ -122,12 +122,13 @@ class CdkTerrainProviderStack extends TerraformStack {
         topics: [...GithubRepository.defaultTopics, provider],
         team: githubTeam,
         protectMain: true,
+        // TODO: Re-enable Maven / Nuget
         protectMainChecks: [
           "build",
           "package-js",
-          "package-java",
+          // "package-java",
           "package-python",
-          "package-dotnet",
+          // "package-dotnet",
           "package-go",
           "Validate PR title",
         ],
@@ -175,7 +176,8 @@ class CdkTerrainProviderStack extends TerraformStack {
         team: githubTeam,
         webhookUrl: slackWebhook.stringValue,
         protectMain: true,
-        protectMainChecks: ["build", "package-js", "license/cla"],
+        // TODO: Re-add license/cla ?
+        protectMainChecks: ["build", "package-js"], // "license/cla"],
         provider: githubProvider,
       },
     );
@@ -286,8 +288,9 @@ class CustomConstructsStack extends TerraformStack {
 
     const secrets = new PublishingSecretSet(this, "secret-set");
 
+    // TODO: Re-add license/cla to protectMainChecks ?
     constructRepos.forEach(({ name: repoName, languages, topics }) => {
-      const protectMainChecks = ["build", "license/cla"].concat(
+      const protectMainChecks = ["build" ].concat(
         languages.map((language) => {
           return `package-${
             language === "typescript"

@@ -41,8 +41,15 @@ deploy.yml (push to main / manual)
 - **Weekly:** Terraform updates, dependency updates
 
 ### PR Automation:
-- `auto-approve.yml` - Auto-approves labeled PRs
+- `auto-approve.yml` - Auto-approves labeled PRs (requires one-time cdktn-io workflow permissions to approve PRs)
 - `automerge.yml` - Enables auto-merge for labeled PRs
+
+> [!IMPORTANT]
+> org must allow workflows to approve PRs:
+>
+> ```bash
+> echo '{"default_workflow_permissions":"read","can_approve_pull_request_reviews":true}' | gh api -X PUT /orgs/cdktn-io/actions/permissions/workflow --input -
+> ```
 
 ---
 
@@ -92,18 +99,19 @@ Your `gh` CLI token needs these scopes for Terraform to create repos:
 ### Still Needed:
 
 #### Credentials to Obtain:
-- [ ] Slack Incoming Webhook URL (from your Slack workspace)
-- [ ] GitHub PAT with `repo`, `workflow`, `admin:org` scopes
-- [ ] npm access token (from npmjs.com)
-- [ ] PyPI API token (from pypi.org)
+- [x] Slack Incoming Webhook URL (from your Slack workspace)
+- [x] ~~GitHub PAT with `repo`, `workflow`, `admin:org` scopes~~
+- [x] GitHub App (gh-app-id & gh-app-private-key)
+- [x] npm access token (from npmjs.com)
+- [x] PyPI API token (from pypi.org)
 
 #### Validation Before Apply:
-- [ ] Verify `gh` CLI scopes: `gh auth status`
-- [ ] Verify team exists: `gh api /orgs/cdktn-io/teams/team-cdk-terrain`
-- [ ] Test npm token: `npm whoami --registry https://registry.npmjs.org/`
+- [x] Verify `gh` CLI scopes: `gh auth status`
+- [x] Verify team exists: `gh api /orgs/cdktn-io/teams/team-cdk-terrain`
+- [x] Test npm token: `npm whoami --registry https://registry.npmjs.org/`
 
 #### Package Publishing (Before Workflows Work):
-- [ ] Publish `@cdktn/provider-project` to npm (required for upgrade-repositories.yml)
+- [x] Publish `@cdktn/provider-project` to npm (required for upgrade-repositories.yml)
 
 ---
 
@@ -125,9 +133,16 @@ slack-webhook               = "https://hooks.slack.com/services/T.../B.../..."
 twine-password              = "pypi-..."
 twine-username              = "__token__"  
 tf-cloud-token              = "Ajsb12h.atlasv1.Klkm0klr5...."
+
+# GitHub app credentials
+gh-app-id          = "..."
+gh-app-private-key = <<-PEM
+...
+PEM
+
 ```
 
-**Total: 8 Terraform variables required.**
+**Total: 10 Terraform variables required.**
 
 ---
 
@@ -718,11 +733,11 @@ Update: These have been removed!
 
 ### Remaining Blockers
 
-- ✅ ~~Fork Strategy~~ - RESOLVED
-- ✅ ~~GitHub Authentication~~ - RESOLVED
-- ⏳ **Fork Execution** - Ready to execute (waiting for user confirmation)
-- ⏳ **@cdktn/provider-project Publishing** - Package ready but not published to npm yet
-- ⏳ **GitHub Actions Secrets** - Need to configure for automation
+- ✅ Fork Strategy - RESOLVED
+- ✅ GitHub Authentication - RESOLVED
+- ✅ **Fork Execution** - RESOLVED
+- ✅ **@cdktn/provider-project Publishing** - RESOLVED
+- ✅ **GitHub Actions Secrets** - RESOLVED
 
 ### Script Location & Usage
 
@@ -767,7 +782,9 @@ gh repo list cdktn-io --limit 50
 - [x] Import blocks generated correctly
 - [x] Documentation updated
 - [x] Remote backend configured
-- [ ] Repos forked to cdktn-io org (ready to execute)
-- [ ] Repos imported into Terraform state (pending fork execution)
-- [ ] Git history preserved (will verify after fork)
-- [ ] Package versions preserved (will verify after fork)
+- [x] ~~Repos forked to cdktn-io org (ready to execute)~~
+- [x] Repos re-created with all history restored
+- [x] Repos imported into Terraform state (pending fork execution)
+- [x] Git history preserved (will verify after fork)
+- [x] Package versions preserved (will verify after fork)
+

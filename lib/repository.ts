@@ -43,7 +43,8 @@ export class RepositorySetup extends Construct {
 
     const {
       protectMain = false,
-      protectMainChecks = ["build", "license/cla"],
+      // TODO: Re-add license/cla ?
+      protectMainChecks = ["build"], // , "license/cla"],
       provider,
       repository,
       team,

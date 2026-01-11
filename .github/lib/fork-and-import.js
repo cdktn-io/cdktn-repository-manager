@@ -241,6 +241,26 @@ async function enableGitHubActions(targetRepoName) {
 }
 
 /**
+ * Enable GitHub Actions to approve pull requests
+ * This setting is not available in Terraform GitHub provider
+ * See: https://github.com/integrations/terraform-provider-github/issues/1228
+ * @param {string} targetRepoName - The repo name (e.g., "cdktn-provider-aws")
+ */
+async function enableActionsToApprovePRs(targetRepoName) {
+  try {
+    console.log(`   🔐 Enabling Actions to approve PRs...`);
+    execSync(
+      `echo '{"default_workflow_permissions":"read","can_approve_pull_request_reviews":true}' | gh api -X PUT /repos/cdktn-io/${targetRepoName}/actions/permissions/workflow --input -`,
+      { stdio: 'pipe', shell: '/bin/bash' }
+    );
+    console.log(`   ✅ Actions can now approve PRs`);
+  } catch (err) {
+    console.error(`   ⚠️  Failed to enable PR approvals: ${err.message}`);
+    // Don't fail the migration, just warn
+  }
+}
+
+/**
  * Clone source repository and push all history to target repository
  * Uses bare clone + mirror push to preserve all branches, tags, and refs
  *
@@ -332,9 +352,12 @@ async function createIndependentRepository(sourceRepoName, targetRepoName) {
  */
 async function fixTeamNames(repoName) {
   const OLD_TEAM = 'team-tf-cdk';
-  const NEW_TEAM = 'team-cdk-terrain';
   const OLD_EMAIL = 'github-team-tf-cdk@hashicorp.com';
-  const NEW_EMAIL = 'github-team-cdk-terrain@cdktn.io';
+
+  const NEW_TEAM = 'team-cdk-terrain[bot]';
+  // `gh api /users/${NEW_TEAM} --jq .id`
+  const APP_USER_ID='254218809'; // HARDCODED FOR NOW
+  const NEW_EMAIL = `<${APP_USER_ID}-${NEW_TEAM}@users.noreply.github.com>`;
 
   try {
     console.log(`   🔧 Fixing team references...`);
@@ -723,14 +746,7 @@ async function main() {
       console.log('  - PRs should be auto-approved and auto-merged');
       console.log('  - Check PR status: gh pr list -R cdktn-io/cdktn-provider-<name>');
       console.log('');
-      console.log('Step 7: Re-enable GitHub Actions on all repositories:');
-      console.log('');
-      console.log('After all migration PRs are merged, re-enable Actions:');
-      console.log('  for repo in ' + Array.from(providerNames).sort().map(p => `cdktn-provider-${p}`).join(' ') + '; do');
-      console.log('    echo "{\\"enabled\\":true,\\"allowed_actions\\":\\"all\\"}" | \\');
-      console.log('      gh api -X PUT /repos/cdktn-io/$repo/actions/permissions --input -');
-      console.log('    echo "✅ Enabled Actions on $repo"');
-      console.log('  done');
+      console.log('✅ GitHub Actions and PR approval permissions have been configured at org level.');
       console.log('');
       console.log('💡 Note: Migration uses GitHub App token (team-cdk-terrain[bot])');
       console.log('   Make sure GH_APP_ID and GH_APP_PRIVATE_KEY secrets are set.');
