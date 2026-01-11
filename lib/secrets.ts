@@ -61,12 +61,16 @@ export class PublishingSecretSet extends Construct {
   private readonly secrets: SecretFromVariable[] = [];
   public readonly ghSecret: SecretFromVariable;
   public readonly npmSecret: SecretFromVariable;
+  public readonly ghAppId: SecretFromVariable;
+  public readonly ghAppPrivateKey: SecretFromVariable;
 
   constructor(scope: Construct, name: string) {
     super(scope, name);
 
     this.secrets = [
-      "gh-token",
+      "gh-token", // TODO: Remove PAT
+      "gh-app-id",
+      "gh-app-private-key",
       "npm-token",
       "twine-username",
       "twine-password",
@@ -82,14 +86,25 @@ export class PublishingSecretSet extends Construct {
     const npmSecret = this.secrets.find((s) => s.name === "npm-token");
     if (!npmSecret) throw new Error("npm-token secret not found");
 
+    // TODO: Remove PAT
     const ghSecret = this.secrets.find((s) => s.name === "gh-token");
     if (!ghSecret) throw new Error("gh-token secret not found");
-
     ghSecret.addAlias("PROJEN_GITHUB_TOKEN");
+    // TODO: Remove - blocked by https://github.com/cdktn-io/cdktn-provider-project/issues/4
     ghSecret.addAlias("GO_GITHUB_TOKEN"); // used for publishing Go packages to separate repo
+
+    const ghAppId = this.secrets.find((s) => s.name === "gh-app-id")
+    if (!ghAppId) throw new Error("gh-app-id secret not found");
+    ghAppId.addAlias("PROJEN_APP_ID")
+
+    const ghAppPrivateKey = this.secrets.find((s) => s.name === "gh-app-private-key")
+    if (!ghAppPrivateKey) throw new Error("gh-app-private-key secret not found");
+    ghAppPrivateKey.addAlias("PROJEN_APP_PRIVATE_KEY")
 
     this.ghSecret = ghSecret;
     this.npmSecret = npmSecret;
+    this.ghAppId = ghAppId;
+    this.ghAppPrivateKey = ghAppPrivateKey;
   }
 
   public forAllLanguages(

@@ -10,7 +10,7 @@
 
 This project handles repository management for the prebuilt Terraform provider packages and custom constructs that are published for use with [CDK Terrain (CDKTN)](https://github.com/open-constructs/cdk-terrain).
 
-CDKTN allows you to use familiar programming languages to define cloud infrastructure and provision it through HashiCorp Terraform. This gives you access to the entire Terraform ecosystem without learning HashiCorp Configuration Language (HCL). Terraform providers can be generated locally to be used with your application, or installed via one of the prebuilt packages. We currently publish and maintain a small subset of prebuilt packages for the Terraform providers that currently have the highest usage in CDKTN apps. The current list of prebuilt provider packages can be found [here](https://github.com/hashicorp/cdktf-repository-manager/blob/main/provider.json).
+CDKTN allows you to use familiar programming languages to define cloud infrastructure and provision it through HashiCorp Terraform. This gives you access to the entire Terraform ecosystem without learning HashiCorp Configuration Language (HCL). Terraform providers can be generated locally to be used with your application, or installed via one of the prebuilt packages. We currently publish and maintain a small subset of prebuilt packages for the Terraform providers that currently have the highest usage in CDKTN apps. The current list of prebuilt provider packages can be found [here](https://github.com/cdktn-io/cdktn-repository-manager/blob/main/provider.json).
 
 ## How we decide which providers to publish prebuilt packages for
 

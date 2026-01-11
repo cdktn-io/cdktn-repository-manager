@@ -21,6 +21,12 @@ jobs:
       PR_ID: ${{ github.event.pull_request.number }}
     if: contains(github.event.pull_request.labels.*.name, 'automerge') && !contains(github.event.pull_request.labels.*.name, 'do-not-merge') && github.event.pull_request.draft == false
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.2.1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -29,5 +35,5 @@ jobs:
       - name: Turn on automerge for this PR by a trusted user or bot
         if: github.event.pull_request.user.login == 'team-cdk-terrain' || contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) || github.actor == 'dependabot[bot]'
         env:
-          GH_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: gh pr merge --auto --squash $PR_ID

@@ -108,6 +108,8 @@ class CdkTerrainProviderStack extends TerraformStack {
       this.createProviderProjectRepo(
         slackWebhook,
         secrets.npmSecret,
+        secrets.ghAppId,
+        secrets.ghAppPrivateKey,
         githubProvider,
         githubTeam,
       );
@@ -161,6 +163,8 @@ class CdkTerrainProviderStack extends TerraformStack {
   private createProviderProjectRepo(
     slackWebhook: TerraformVariable,
     npmSecret: SecretFromVariable,
+    ghAppIdSecret: SecretFromVariable,
+    ghAppPrivateKeySecret: SecretFromVariable,
     githubProvider: GithubProvider,
     githubTeam: DataGithubTeam,
   ) {
@@ -177,6 +181,8 @@ class CdkTerrainProviderStack extends TerraformStack {
     );
 
     npmSecret.for(templateRepository.resource, githubProvider);
+    ghAppIdSecret.for(templateRepository.resource, githubProvider);
+    ghAppPrivateKeySecret.for(templateRepository.resource, githubProvider);
 
     new TerraformOutput(this, "templateRepoUrl", {
       value: templateRepository?.resource.htmlUrl,
@@ -191,7 +197,10 @@ class CdkTerrainProviderStack extends TerraformStack {
     const selfTokens = [
       // TODO: Remote Backend credentials (S3)
       new SecretFromVariable(this, "tf-cloud-token"),
+      // TODO: Only keep GitHub App credentials for automation
       new SecretFromVariable(this, "gh-comment-token"),
+      new SecretFromVariable(this, "gh-app-id"),
+      new SecretFromVariable(this, "gh-app-private-key"),
     ];
 
     const self = new GithubRepository(this, "cdktn-repository-manager", {

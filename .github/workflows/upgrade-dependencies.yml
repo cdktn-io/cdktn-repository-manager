@@ -11,6 +11,17 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      - name: Get GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Setup Node.js
@@ -46,7 +57,7 @@ jobs:
           commit-message: "chore(deps): upgrade dependencies for this repo only"
           title: "chore(deps): upgrade dependencies for this repo only"
           body: |
-            This PR upgrades dependencies used by this repo (`cdktf-repository-manager`) to their latest version based on the version range specified in the `package.json` file.
+            This PR upgrades dependencies used by this repo (`cdktn-repository-manager`) to their latest version based on the version range specified in the `package.json` file.
             For reference, here is the output from `yarn outdated` prior to running `yarn upgrade` which was used to produce this PR:
 
             ```
@@ -57,8 +68,8 @@ jobs:
 
             For future reference: the reason why we're not using Dependabot for this is because this repo has a tendency to run into rate limits, and Dependabot produces so many PRs and workflow runs that it'd be likely to hit those limits quickly.
           labels: automerge,auto-approve,dependencies
-          token: ${{ secrets.GH_COMMENT_TOKEN }}
-          author: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
-          committer: team-cdk-terrain <github-team-cdk-terrain@cdktn.io>
+          token: ${{ steps.app-token.outputs.token }}
+          author: ${{ steps.app-token.outputs.app-slug }}[bot] <${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com>
+          committer: ${{ steps.app-token.outputs.app-slug }}[bot] <${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com>
           signoff: true
           delete-branch: true

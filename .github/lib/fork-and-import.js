@@ -6,12 +6,21 @@
 /**
  * Fork and Import Script
  *
- * Automates the process of forking GitHub repositories from the cdktf org
- * to the cdktn-io org and generating Terraform import blocks.
+ * Automates the process of creating independent GitHub repositories in cdktn-io org
+ * from archived cdktf org repositories. Preserves complete git history using
+ * bare clone + mirror push strategy.
+ *
+ * Creates truly independent repositories (NOT GitHub forks) to avoid:
+ * - Pull requests defaulting to archived upstream
+ * - Fork network limitations (one fork per user)
+ * - Contribution graph visibility issues
+ * - Search discoverability problems
+ *
+ * See plans/fork-vs-new.md for detailed rationale.
  *
  * Usage:
  *   node fork-and-import.js <stack-dir>         # Dry-run mode (default)
- *   node fork-and-import.js <stack-dir> --yes   # Execute forks
+ *   node fork-and-import.js <stack-dir> --yes   # Execute migration
  *
  * Example:
  *   node .github/lib/fork-and-import.js cdktf.out/stacks/repos
@@ -37,7 +46,7 @@ if (!stackDir) {
   console.error('Usage: node fork-and-import.js <stack-dir> [options]');
   console.error('');
   console.error('Options:');
-  console.error('  --yes                    Execute forks (default: dry-run)');
+  console.error('  --yes                    Execute migration (default: dry-run)');
   console.error('  --only=repo1,repo2       Only process these repos');
   console.error('  --exclude=repo1,repo2    Exclude these repos');
   console.error('');
@@ -156,57 +165,169 @@ function checkTargetRepo(repoName) {
 }
 
 /**
- * Fork repository from cdktf to cdktn-io
- * @param {string} sourceRepoName - The repo name in cdktf org (e.g., "cdktf-provider-aws")
- * @param {string} targetRepoName - The desired repo name in cdktn-io org (e.g., "cdktn-provider-aws")
+ * Create an empty repository in cdktn-io org
+ * @param {string} targetRepoName - The desired repo name (e.g., "cdktn-provider-aws")
+ * @returns {Promise<boolean>} Success status
  */
-async function forkRepository(sourceRepoName, targetRepoName) {
+async function createEmptyRepository(targetRepoName) {
   try {
-    console.log(`   🔄 Initiating fork of cdktf/${sourceRepoName}...`);
+    console.log(`   🔨 Creating empty repository...`);
 
-    // Initiate fork and rename it to cdktn-provider-*
+    // Create public repository in cdktn-io org
     execSync(
-      `gh repo fork cdktf/${sourceRepoName} --org=cdktn-io --fork-name="${targetRepoName}"`,
+      `gh repo create cdktn-io/${targetRepoName} --public`,
       { stdio: 'pipe' }
     );
 
-    // Wait for fork to complete (poll until accessible)
+    // Poll until accessible (max 10 attempts = 20 seconds)
     let attempts = 0;
-    const maxAttempts = 30;  // Max 30 attempts (60 seconds)
+    const maxAttempts = 10;
 
     while (attempts < maxAttempts) {
       try {
-        // Check if fork exists with target name
         execSync(`gh api /repos/cdktn-io/${targetRepoName} --silent`, { stdio: 'pipe' });
-        console.log(`   ✅ Fork created as ${targetRepoName}`);
-
-        // // Rename if target name is different
-        // if (sourceRepoName !== targetRepoName) {
-        //   console.log(`   🔄 Renaming to ${targetRepoName}...`);
-        //   execSync(
-        //     `gh api PATCH /repos/cdktn-io/${sourceRepoName} -f name="${targetRepoName}"`,
-        //     { stdio: 'pipe' }
-        //   );
-        //   console.log(`   ✅ Renamed successfully`);
-        // }
-
+        console.log(`   ✅ Repository created: cdktn-io/${targetRepoName}`);
         return true;
       } catch {
         process.stdout.write('.');
-        await new Promise(resolve => setTimeout(resolve, 2000));  // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000));
         attempts++;
       }
     }
 
-    throw new Error(`Fork timeout for ${sourceRepoName} after ${maxAttempts * 2} seconds`);
+    throw new Error(`Repository creation timeout after ${maxAttempts * 2} seconds`);
   } catch (err) {
-    console.error(`   ❌ Failed: ${err.message}`);
+    console.error(`   ❌ Failed to create repository: ${err.message}`);
     throw err;
   }
 }
 
 /**
- * Fix team names and email addresses in workflow files after forking
+ * Disable GitHub Actions on a repository
+ * Prevents workflows from running during migration setup
+ * @param {string} targetRepoName - The repo name (e.g., "cdktn-provider-aws")
+ */
+async function disableGitHubActions(targetRepoName) {
+  try {
+    console.log(`   🔒 Disabling GitHub Actions...`);
+    execSync(
+      `echo '{"enabled":false}' | gh api -X PUT /repos/cdktn-io/${targetRepoName}/actions/permissions --input -`,
+      { stdio: 'pipe', shell: '/bin/bash' }
+    );
+    console.log(`   ✅ Actions disabled`);
+  } catch (err) {
+    console.error(`   ⚠️  Failed to disable Actions: ${err.message}`);
+    // Don't fail the migration, just warn
+  }
+}
+
+/**
+ * Re-enable GitHub Actions on a repository
+ * Called after migration and team name fixes are complete
+ * @param {string} targetRepoName - The repo name (e.g., "cdktn-provider-aws")
+ */
+async function enableGitHubActions(targetRepoName) {
+  try {
+    console.log(`   🔓 Re-enabling GitHub Actions...`);
+    execSync(
+      `echo '{"enabled":true,"allowed_actions":"all"}' | gh api -X PUT /repos/cdktn-io/${targetRepoName}/actions/permissions --input -`,
+      { stdio: 'pipe', shell: '/bin/bash' }
+    );
+    console.log(`   ✅ Actions re-enabled`);
+  } catch (err) {
+    console.error(`   ⚠️  Failed to re-enable Actions: ${err.message}`);
+    // Don't fail the migration, just warn
+  }
+}
+
+/**
+ * Clone source repository and push all history to target repository
+ * Uses bare clone + mirror push to preserve all branches, tags, and refs
+ *
+ * @param {string} sourceRepoName - Source repo in cdktf org (e.g., "cdktf-provider-aws")
+ * @param {string} targetRepoName - Target repo in cdktn-io org (e.g., "cdktn-provider-aws")
+ */
+async function migrateRepositoryHistory(sourceRepoName, targetRepoName) {
+  const tempDir = execSync('mktemp -d').toString().trim();
+  const originalDir = process.cwd();
+
+  try {
+    console.log(`   📥 Cloning source repository...`);
+
+    // Bare clone captures all refs (branches, tags, etc.)
+    process.chdir(tempDir);
+    execSync(
+      `git clone --bare https://github.com/cdktf/${sourceRepoName}.git repo.git`,
+      { stdio: 'pipe' }
+    );
+
+    // Enter bare repo directory
+    process.chdir('repo.git');
+
+    console.log(`   🔄 Pushing all history to new repository...`);
+
+    // Add new remote pointing to cdktn-io repo
+    execSync(
+      `git remote add cdktn-io https://github.com/cdktn-io/${targetRepoName}.git`,
+      { stdio: 'pipe' }
+    );
+
+    // Mirror push - atomic operation that pushes all refs
+    execSync(`git push --mirror cdktn-io`, { stdio: 'pipe' });
+
+    console.log(`   ✅ History migration complete`);
+
+  } catch (err) {
+    console.error(`   ❌ History migration failed: ${err.message}`);
+    throw err;
+  } finally {
+    // Always cleanup temp directory
+    process.chdir(originalDir);
+    execSync(`rm -rf ${tempDir}`, { stdio: 'pipe' });
+  }
+}
+
+/**
+ * Create independent repository and migrate full history
+ * This creates a new repository (not a GitHub fork) and pushes complete history
+ *
+ * @param {string} sourceRepoName - Source repo in cdktf org
+ * @param {string} targetRepoName - Target repo in cdktn-io org
+ */
+async function createIndependentRepository(sourceRepoName, targetRepoName) {
+  try {
+    console.log(`   🚀 Creating independent repository...`);
+
+    // Step 1: Create empty repo in cdktn-io org
+    await createEmptyRepository(targetRepoName);
+
+    // Step 2: Disable GitHub Actions to prevent workflows from running during setup
+    // This matches fork behavior where actions are disabled by default
+    await disableGitHubActions(targetRepoName);
+
+    // Step 3: Clone source and push all history
+    await migrateRepositoryHistory(sourceRepoName, targetRepoName);
+
+    console.log(`   ✅ Independent repository created successfully`);
+    return true;
+
+  } catch (err) {
+    console.error(`   ❌ Failed: ${err.message}`);
+
+    // Attempt cleanup of partially created repo
+    try {
+      execSync(`gh repo delete cdktn-io/${targetRepoName} --yes`, { stdio: 'pipe' });
+      console.log(`   🧹 Cleaned up partial repository`);
+    } catch {
+      console.log(`   ⚠️  Manual cleanup needed: gh repo delete cdktn-io/${targetRepoName}`);
+    }
+
+    throw err;
+  }
+}
+
+/**
+ * Fix team names and email addresses in workflow files after creating independent repository
  * @param {string} repoName - The repository name (e.g., "cdktn-provider-http")
  */
 async function fixTeamNames(repoName) {
@@ -225,7 +346,7 @@ async function fixTeamNames(repoName) {
     try {
       // Clone the forked repo
       process.chdir(tempDir);
-      execSync(`gh repo clone cdktn-io/${repoName} . --quiet`, { stdio: 'pipe' });
+      execSync(`gh repo clone cdktn-io/${repoName} . -- --quiet`, { stdio: 'pipe' });
       let filesChanged = 0;
 
       // update CODEOWNERS (skip on any error)
@@ -375,7 +496,7 @@ async function main() {
   console.log('║  Fork and Import Script for CDKTN Repository Manager     ║');
   console.log('╚══════════════════════════════════════════════════════════╝');
   console.log('');
-  console.log(`🔍 Mode: ${dryRun ? 'DRY-RUN (no changes will be made)' : 'EXECUTE (will fork repos)'}`);
+  console.log(`🔍 Mode: ${dryRun ? 'DRY-RUN (no changes will be made)' : 'EXECUTE (will migrate repos)'}`);
   console.log(`📁 Stack: ${stackDir}`);
   console.log('');
 
@@ -447,14 +568,14 @@ async function main() {
     process.exit(1);
   }
 
-  // 3. Fork repos (only if --yes flag)
+  // 3. Create independent repositories (only if --yes flag)
   if (!dryRun) {
     const toFork = results.filter(r => r.action === 'fork');
 
     if (toFork.length === 0) {
-      console.log('ℹ️  No repositories to fork (all will be created fresh)');
+      console.log('ℹ️  No repositories to migrate (all will be created fresh)');
     } else {
-      console.log('🚀 Forking repositories...');
+      console.log('🚀 Creating independent repositories with full history...');
       console.log('');
 
       for (let i = 0; i < toFork.length; i++) {
@@ -462,23 +583,31 @@ async function main() {
         console.log(`[${i + 1}/${toFork.length}] ${repo.name}`);
 
         try {
-          await forkRepository(repo.sourceName, repo.name);
+          // Create independent repository (not a fork!)
+          // This also disables GitHub Actions to prevent workflows from running during setup
+          await createIndependentRepository(repo.sourceName, repo.name);
 
-          // Fix team names in workflow files (no branch protection yet!)
+          // Fix team names in workflow files
+          // NOTE: No branch protection exists yet on new repos
           await fixTeamNames(repo.name);
 
-          // Add delay between forks to avoid rate limiting
+          // Re-enable GitHub Actions now that setup is complete
+          // This allows the migrate-provider workflow to auto-approve
+          await enableGitHubActions(repo.name);
+
+          // Add delay between repos to avoid rate limiting
           if (i < toFork.length - 1) {
-            console.log(`   ⏸️  Waiting 3 seconds before next fork...`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log(`   ⏸️  Waiting 5 seconds before next repository...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
           }
         } catch (err) {
-          console.error(`   ❌ Fork failed: ${err.message}`);
+          console.error(`   ❌ Migration failed: ${err.message}`);
           console.error('');
           console.error('Aborting. You may need to:');
           console.error('  1. Check your GitHub token has repo and admin:org scopes');
           console.error('  2. Verify the source repo exists and is accessible');
           console.error('  3. Check GitHub API rate limits');
+          console.error('  4. If repo was partially created, delete it: gh repo delete cdktn-io/' + repo.name);
           process.exit(1);
         }
 
@@ -501,8 +630,8 @@ async function main() {
   const toFork = results.filter(r => r.action === 'fork').length;
   const toCreate = results.filter(r => r.action === 'create-fresh').length;
 
-  console.log(`   Repositories to fork:   ${toFork}`);
-  console.log(`   Repositories to create: ${toCreate}`);
+  console.log(`   Repositories to migrate:   ${toFork}`);
+  console.log(`   Repositories to create:    ${toCreate}`);
   console.log(`   Total (filtered):       ${results.length}`);
 
   // Show filtering info
@@ -517,7 +646,7 @@ async function main() {
   console.log('');
 
   if (dryRun) {
-    console.log('⚠️  DRY-RUN MODE: No repos were forked.');
+    console.log('⚠️  DRY-RUN MODE: No repos were migrated.');
     console.log('');
     console.log('Next steps:');
     console.log(`  1. Review the generated import.tf file:`);
@@ -526,7 +655,7 @@ async function main() {
     console.log('  2. If everything looks good, run with --yes flag:');
     console.log(`     node .github/lib/fork-and-import.js ${stackDir} --yes`);
   } else {
-    console.log('✅ Forks completed successfully!');
+    console.log('✅ Migration completed successfully!');
     console.log('');
     console.log('Next steps:');
     console.log(`  1. cd ${stackDir}`);
@@ -555,6 +684,57 @@ async function main() {
 
     console.log('  3. terraform apply # Import into state');
     console.log('  4. rm import.tf    # Clean up after import');
+    console.log('');
+    console.log('🔄 Migrate providers to @cdktn scope:');
+    console.log('');
+    console.log('After Terraform import completes, trigger the migrate-provider workflow');
+    console.log('for each repository to create PRs that:');
+    console.log('  - Update .projenrc.js to use @cdktn/provider-project');
+    console.log('  - Remove isDeprecated flag');
+    console.log('  - Regenerate all files with projen');
+    console.log('');
+
+    // Get list of provider names (without -go suffix)
+    const providerNames = new Set();
+    for (const repo of results.filter(r => r.action === 'fork')) {
+      // Extract provider name: cdktn-provider-aws -> aws, cdktn-provider-aws-go -> skip
+      if (!repo.name.endsWith('-go')) {
+        const match = repo.name.match(/^cdktn-provider-(.+)$/);
+        if (match) {
+          providerNames.add(match[1]);
+        }
+      }
+    }
+
+    if (providerNames.size > 0) {
+      console.log('Step 5: Trigger migrate-provider workflows (one command per provider):');
+      console.log('');
+      for (const provider of Array.from(providerNames).sort()) {
+        console.log(`  gh workflow run migrate-provider.yml -f provider=${provider}`);
+      }
+      console.log('');
+      console.log('Or use a loop to trigger all:');
+      console.log('  for provider in ' + Array.from(providerNames).sort().join(' ') + '; do');
+      console.log('    gh workflow run migrate-provider.yml -f provider=$provider');
+      console.log('    sleep 2');
+      console.log('  done');
+      console.log('');
+      console.log('Step 6: Wait for migration PRs to be created and merged');
+      console.log('  - PRs should be auto-approved and auto-merged');
+      console.log('  - Check PR status: gh pr list -R cdktn-io/cdktn-provider-<name>');
+      console.log('');
+      console.log('Step 7: Re-enable GitHub Actions on all repositories:');
+      console.log('');
+      console.log('After all migration PRs are merged, re-enable Actions:');
+      console.log('  for repo in ' + Array.from(providerNames).sort().map(p => `cdktn-provider-${p}`).join(' ') + '; do');
+      console.log('    echo "{\\"enabled\\":true,\\"allowed_actions\\":\\"all\\"}" | \\');
+      console.log('      gh api -X PUT /repos/cdktn-io/$repo/actions/permissions --input -');
+      console.log('    echo "✅ Enabled Actions on $repo"');
+      console.log('  done');
+      console.log('');
+      console.log('💡 Note: Migration uses GitHub App token (team-cdk-terrain[bot])');
+      console.log('   Make sure GH_APP_ID and GH_APP_PRIVATE_KEY secrets are set.');
+    }
   }
 }
 

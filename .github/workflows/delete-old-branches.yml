@@ -23,16 +23,29 @@ jobs:
       matrix: ${{fromJSON(needs.build-provider-matrix.outputs.matrix)}}
       max-parallel: 10
     steps:
-      - name: Checkout cdktf-provider-${{ matrix.provider }} Repository
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.2.1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cdktn-io
+          repositories: cdktn-provider-${{ matrix.provider }}
+      - name: Get GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Checkout cdktn-provider-${{ matrix.provider }} Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          repository: cdktf/cdktf-provider-${{ matrix.provider }}
-          token: ${{ secrets.GH_COMMENT_TOKEN }}
+          repository: cdktn-io/cdktn-provider-${{ matrix.provider }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
       - name: Set git identity
         run: |-
-          git config user.name "team-cdk-terrain"
-          git config user.email "github-team-cdk-terrain@cdktn.io"
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
       - name: Delete old branches from previous repo-manager runs
         run: git branch -r | egrep -o "upgrade-provider-project.*" | xargs -n 1 git push origin --delete
         continue-on-error: true # don't fail the run if these branches never existed

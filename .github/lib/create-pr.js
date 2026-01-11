@@ -13,8 +13,8 @@ module.exports = async ({
 }) => {
   const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
   const url = `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
-  const repo = fullRepoName || `cdktf-provider-${providerName}`;
-  const owner = "cdktf";
+  const repo = fullRepoName || `cdktn-provider-${providerName}`;
+  const owner = "cdktn-io";
 
   const { data } = await github.rest.pulls.create({
     owner,

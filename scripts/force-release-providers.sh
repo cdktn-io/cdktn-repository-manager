@@ -28,7 +28,7 @@ for provider in $providers; do
 
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Finding SHA for PR for $provider"
-    repo_name="cdktf/cdktf-provider-$provider"
+    repo_name="cdktn-io/cdktn-provider-$provider"
 
     output=$(gh pr list --repo $repo_name --state merged --json mergeCommit --search "$filter" | jq -rcM '.[] | .mergeCommit.oid')
 
