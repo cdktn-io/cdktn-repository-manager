@@ -268,7 +268,9 @@ async function enableActionsToApprovePRs(targetRepoName) {
  * @param {string} targetRepoName - Target repo in cdktn-io org (e.g., "cdktn-provider-aws")
  */
 async function migrateRepositoryHistory(sourceRepoName, targetRepoName) {
-  const tempDir = execSync('mktemp -d').toString().trim();
+  // Use /var/tmp instead of /tmp to avoid tmpfs space limits
+  // /var/tmp uses the root filesystem which has more space
+  const tempDir = execSync('mktemp -d -p /var/tmp').toString().trim();
   const originalDir = process.cwd();
 
   try {
@@ -278,7 +280,7 @@ async function migrateRepositoryHistory(sourceRepoName, targetRepoName) {
     process.chdir(tempDir);
     execSync(
       `git clone --bare https://github.com/cdktf/${sourceRepoName}.git repo.git`,
-      { stdio: 'pipe' }
+      { stdio: 'inherit' }
     );
 
     // Enter bare repo directory
@@ -286,25 +288,153 @@ async function migrateRepositoryHistory(sourceRepoName, targetRepoName) {
 
     console.log(`   🔄 Pushing all history to new repository...`);
 
-    // Add new remote pointing to cdktn-io repo
-    execSync(
-      `git remote add cdktn-io https://github.com/cdktn-io/${targetRepoName}.git`,
-      { stdio: 'pipe' }
-    );
+    // Use SSH for pushing - more reliable for large repos (no HTTP timeouts)
+    // Requires: gh ssh-key add ~/.ssh/id_ed25519.pub (or similar)
+    const useSSH = process.env.USE_SSH === '1' || process.env.USE_SSH === 'true';
 
-    // Mirror push - atomic operation that pushes all refs
-    execSync(`git push --mirror cdktn-io`, { stdio: 'pipe' });
+    let remoteUrl;
+    if (useSSH) {
+      remoteUrl = `git@github.com:cdktn-io/${targetRepoName}.git`;
+      console.log(`   🔑 Using SSH for push (more reliable for large repos)`);
+    } else {
+      // Get GitHub token from environment
+      const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+      if (!githubToken) {
+        throw new Error('GITHUB_TOKEN or GH_TOKEN environment variable is required (or set USE_SSH=1)');
+      }
+      remoteUrl = `https://x-access-token:${githubToken}@github.com/cdktn-io/${targetRepoName}.git`;
+    }
+
+    execSync(`git remote add cdktn-io "${remoteUrl}"`, { stdio: 'pipe' });
+
+    // Configure git for large repository pushes
+    execSync('git config http.postBuffer 524288000', { stdio: 'pipe' }); // 500 MB
+    execSync('git config http.lowSpeedTime 999999', { stdio: 'pipe' }); // Very long timeout
+    // execSync('git config pack.windowMemory 256m', { stdio: 'pipe' }); // Limit memory for packing
+    // execSync('git config pack.threads 4', { stdio: 'pipe' }); // Limit threads
+
+    // Get all refs to push
+    const allRefs = execSync('git show-ref', { encoding: 'utf-8' })
+      .trim()
+      .split('\n')
+      .map(line => line.split(' ')[1]); // Extract ref names
+
+    // Separate branches and tags
+    const branches = allRefs.filter(ref => ref.startsWith('refs/heads/'));
+    const tags = allRefs.filter(ref => ref.startsWith('refs/tags/'));
+    const other = allRefs.filter(ref => !ref.startsWith('refs/heads/') && !ref.startsWith('refs/tags/'));
+
+    console.log(`   📊 Found ${branches.length} branches, ${tags.length} tags, ${other.length} other refs`);
+
+    // Helper function to push with retry
+    const pushWithRetry = (refs, description, maxRetries = 3) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          execSync(`git push cdktn-io ${refs.join(' ')}`, { stdio: 'inherit' });
+          return; // Success
+        } catch (err) {
+          if (attempt === maxRetries) {
+            throw err;
+          }
+          console.log(`   ⚠️  Push failed (attempt ${attempt}/${maxRetries}), retrying in 5s...`);
+          execSync('sleep 5');
+        }
+      }
+    };
+
+    // For large repos, we must push ONE REF AT A TIME to avoid GitHub's 2GB pack limit
+    // After the first push, subsequent pushes only send delta objects (much smaller)
+
+    // Push main branch first (contains most objects - this is the big one)
+    const mainBranch = branches.find(b => b === 'refs/heads/main' || b === 'refs/heads/master');
+    if (mainBranch) {
+      console.log(`   ⬆️  Pushing ${mainBranch.replace('refs/heads/', '')} branch (this is the big one, may take a while)...`);
+      pushWithRetry([mainBranch], 'main branch');
+      console.log(`   ✅ Main branch pushed - subsequent pushes will be much faster (delta only)`);
+    }
+
+    // Push other branches ONE AT A TIME
+    const otherBranches = branches.filter(b => b !== mainBranch);
+    if (otherBranches.length > 0) {
+      console.log(`   ⬆️  Pushing ${otherBranches.length} other branches (one at a time)...`);
+      for (let i = 0; i < otherBranches.length; i++) {
+        const branch = otherBranches[i];
+        const branchName = branch.replace('refs/heads/', '');
+        process.stdout.write(`   📦 Branch ${i + 1}/${otherBranches.length}: ${branchName}...`);
+        try {
+          execSync(`git push cdktn-io ${branch}`, { stdio: 'inherit' });
+          console.log(' ✓');
+        } catch (err) {
+          console.log(' ✗ (will retry)');
+          pushWithRetry([branch], branchName);
+        }
+      }
+    }
+
+    // Push tags ONE AT A TIME to avoid 2GB pack limit
+    // After main is pushed, each tag only sends its unique objects (small delta)
+    if (tags.length > 0) {
+      console.log(`   ⬆️  Pushing ${tags.length} tags (one at a time for large repo compatibility)...`);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < tags.length; i++) {
+        const tag = tags[i];
+        const tagName = tag.replace('refs/tags/', '');
+
+        // Show progress every 10 tags or on specific milestones
+        if (i % 10 === 0 || i === tags.length - 1) {
+          process.stdout.write(`\r   📦 Tags: ${i + 1}/${tags.length} (${successCount} ok, ${failCount} failed)`);
+        }
+
+        try {
+          execSync(`git push cdktn-io ${tag}`, { stdio: 'inherit' });
+          successCount++;
+        } catch (err) {
+          // Retry once
+          try {
+            execSync('sleep 1');
+            execSync(`git push cdktn-io ${tag}`, { stdio: 'inherit' });
+            successCount++;
+          } catch (retryErr) {
+            failCount++;
+            // Log failed tags for manual retry
+            console.log(`\n   ⚠️  Failed to push tag: ${tagName}`);
+          }
+        }
+      }
+      console.log(`\n   ✅ Tags complete: ${successCount} pushed, ${failCount} failed`);
+    }
+
+    // Push other refs ONE AT A TIME
+    if (other.length > 0) {
+      console.log(`   ⬆️  Pushing ${other.length} other refs (one at a time)...`);
+      for (const ref of other) {
+        try {
+          execSync(`git push cdktn-io ${ref}`, { stdio: 'inherit' });
+        } catch (err) {
+          console.log(`   ⚠️  Failed to push: ${ref}`);
+        }
+      }
+    }
 
     console.log(`   ✅ History migration complete`);
 
   } catch (err) {
     console.error(`   ❌ History migration failed: ${err.message}`);
-    throw err;
-  } finally {
-    // Always cleanup temp directory
+    console.error(`   📁 Temp directory preserved for debugging: ${tempDir}`);
+    console.error(`   💡 You can retry manually:`);
+    console.error(`      cd ${tempDir}/repo.git`);
+    console.error(`      git push cdktn-io --all`);
+    console.error(`      git push cdktn-io --tags`);
+    // Don't cleanup temp dir on error - preserve for manual retry
     process.chdir(originalDir);
-    execSync(`rm -rf ${tempDir}`, { stdio: 'pipe' });
+    throw err;
   }
+
+  // Only cleanup on success
+  process.chdir(originalDir);
+  execSync(`rm -rf ${tempDir}`, { stdio: 'pipe' });
 }
 
 /**
@@ -315,11 +445,14 @@ async function migrateRepositoryHistory(sourceRepoName, targetRepoName) {
  * @param {string} targetRepoName - Target repo in cdktn-io org
  */
 async function createIndependentRepository(sourceRepoName, targetRepoName) {
+  let repoCreated = false;
+
   try {
     console.log(`   🚀 Creating independent repository...`);
 
     // Step 1: Create empty repo in cdktn-io org
     await createEmptyRepository(targetRepoName);
+    repoCreated = true;
 
     // Step 2: Disable GitHub Actions to prevent workflows from running during setup
     // This matches fork behavior where actions are disabled by default
@@ -334,12 +467,29 @@ async function createIndependentRepository(sourceRepoName, targetRepoName) {
   } catch (err) {
     console.error(`   ❌ Failed: ${err.message}`);
 
-    // Attempt cleanup of partially created repo
-    try {
-      execSync(`gh repo delete cdktn-io/${targetRepoName} --yes`, { stdio: 'pipe' });
-      console.log(`   🧹 Cleaned up partial repository`);
-    } catch {
-      console.log(`   ⚠️  Manual cleanup needed: gh repo delete cdktn-io/${targetRepoName}`);
+    if (repoCreated) {
+      // Don't auto-delete! The push might have partially succeeded
+      // Check if the repo has any content before deciding
+      console.log(`   🔍 Checking if repository has content...`);
+      try {
+        const branchCount = execSync(
+          `gh api /repos/cdktn-io/${targetRepoName}/branches --jq 'length'`,
+          { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+        ).trim();
+
+        if (branchCount && parseInt(branchCount) > 0) {
+          console.log(`   ⚠️  Repository has ${branchCount} branches - data may have been pushed!`);
+          console.log(`   💡 Check the repo: https://github.com/cdktn-io/${targetRepoName}`);
+          console.log(`   💡 If incomplete, delete manually: gh repo delete cdktn-io/${targetRepoName} --yes`);
+        } else {
+          console.log(`   📭 Repository is empty - cleaning up...`);
+          execSync(`gh repo delete cdktn-io/${targetRepoName} --yes`, { stdio: 'pipe' });
+          console.log(`   🧹 Cleaned up empty repository`);
+        }
+      } catch (checkErr) {
+        console.log(`   ⚠️  Could not check repo state. Manual cleanup may be needed:`);
+        console.log(`      gh repo delete cdktn-io/${targetRepoName} --yes`);
+      }
     }
 
     throw err;
@@ -362,8 +512,8 @@ async function fixTeamNames(repoName) {
   try {
     console.log(`   🔧 Fixing team references...`);
 
-    // Create temp directory
-    const tempDir = execSync('mktemp -d').toString().trim();
+    // Create temp directory (use /var/tmp to avoid tmpfs space limits)
+    const tempDir = execSync('mktemp -d -p /var/tmp').toString().trim();
     const originalDir = process.cwd();
 
     try {
@@ -627,7 +777,7 @@ async function main() {
           console.error(`   ❌ Migration failed: ${err.message}`);
           console.error('');
           console.error('Aborting. You may need to:');
-          console.error('  1. Check your GitHub token has repo and admin:org scopes');
+          console.error('  1. Check your GitHub token has repo, workflow and admin:org scopes');
           console.error('  2. Verify the source repo exists and is accessible');
           console.error('  3. Check GitHub API rate limits');
           console.error('  4. If repo was partially created, delete it: gh repo delete cdktn-io/' + repo.name);

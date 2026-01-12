@@ -1,4 +1,5 @@
 [tools]
+gh = "latest"
 jq = "latest"
 node = "24"
 opentofu = "latest"

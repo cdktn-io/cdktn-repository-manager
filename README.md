@@ -78,3 +78,28 @@ terraform apply
 ```
 
 For more details, see [plans/setup.md](plans/setup.md).
+
+### Migrating Large Provider Repositories
+
+Large providers like AWS (6.88 GiB, 2.5M objects) cannot be migrated from a local machine due to GitHub's 2GB pack size limit and HTTP timeouts. For these repositories, use an EC2 instance in a US region for faster, more reliable uploads.
+
+```bash
+# Launch an Amazon Linux 2023 ARM64 instance (e.g., m6g.2xlarge in us-east-1)
+# Then run the bootstrap script:
+curl -fsSL https://raw.githubusercontent.com/cdktn-io/cdktn-repository-manager/main/scripts/al2023-bootstrap.sh | bash
+
+# Authenticate with GitHub
+export GH_TOKEN="your_github_token"
+gh auth login --with-token <<< "$GH_TOKEN"
+gh ssh-key add ~/.ssh/migration_key.pub --title "EC2 Migration"
+
+# Build and run migration with SSH (recommended for large repos)
+cd ~/cdktn-repository-manager
+yarn install && yarn build && yarn synth
+USE_SSH=1 GITHUB_TOKEN=$(gh auth token) node .github/lib/fork-and-import.js \
+  cdktf.out/stacks/repos --only=cdktn-provider-aws --yes
+```
+
+The script pushes refs one at a time to avoid GitHub's 2GB pack limit. After the main branch is pushed (with all base objects), subsequent tag pushes only send delta objects, keeping each pack small.
+
+For troubleshooting and detailed technical information, see [plans/large-providers.md](plans/large-providers.md).
