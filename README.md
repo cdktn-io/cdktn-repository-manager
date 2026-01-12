@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 >
-> [OCF](https://the-ocf.org/) - [github.com/open-constructs](https://github.com/open-constructs) has stepped up to fork under the new name of [CDK Terrain - cdktn.io](https://cdktn.io)
+> [OCF](https://the-ocf.org/) - [github.com/open-constructs](https://github.com/open-constructs) has stepped up to fork under the new name of [CDK Terrain - cdktn.io](http://cdktn.io)
 
 # repository-manager
 
