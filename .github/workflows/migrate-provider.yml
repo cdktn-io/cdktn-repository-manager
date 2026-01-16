@@ -10,7 +10,8 @@ on:
 jobs:
   migrate-provider-repo:
     name: Migrate provider to @cdktn scope
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     env:
       PROVIDER_REPO: ${{ format('cdktn-io/cdktn-provider-{0}', inputs.provider) }}
     steps:

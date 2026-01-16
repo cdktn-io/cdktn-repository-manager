@@ -1,6 +1,6 @@
 [tools]
 gh = "latest"
 jq = "latest"
-node = "24"
+node = "20" # move to v22+ after node-gyp isue resolved in CDKTF
 opentofu = "latest"
 terraform = "1.13.3"

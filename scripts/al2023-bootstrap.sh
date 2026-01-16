@@ -37,6 +37,10 @@ echo "Installing system dependencies..."
 sudo dnf update -y
 sudo dnf install -y git tar gzip unzip
 
+# Fix gpg issue
+sudo dnf install -y gnupg2 --allowerasing
+export MISE_GPG=gpg2
+
 # Install mise (formerly rtx) - handles node, terraform, gh, jq
 echo ""
 echo "Installing mise..."
@@ -77,6 +81,8 @@ echo "Verifying installations..."
 # Install yarn
 echo ""
 echo "Enabling corepack" # auto install yarn, pnpm, ...
+# ensure node 20 is globally available
+~/.local/bin/mise mise use -g node@20
 corepack enable
 
 # Set up SSH key for GitHub (optional but recommended for large repos)
@@ -118,7 +124,6 @@ echo "Next steps:"
 echo ""
 echo "1. Authenticate with GitHub CLI:"
 echo "   export GH_TOKEN=\"your_github_token_here\""
-echo "   gh auth login --with-token <<< \"\$GH_TOKEN\""
 echo "   gh auth status"
 echo ""
 echo "2. Add the SSH key to GitHub via CLI (alternative to step 1):"
