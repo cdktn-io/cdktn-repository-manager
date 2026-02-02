@@ -8,10 +8,11 @@ import {
   App,
   TerraformStack,
   TerraformOutput,
-  RemoteBackend,
   Annotations,
   Aspects,
   MigrateIds,
+  S3BackendConfig,
+  S3Backend,
 } from "cdktf";
 import {
   GithubRepository,
@@ -36,6 +37,16 @@ type StackShards = {
     };
   };
 };
+
+// TODO: Remove hardcoded s3 backend props
+const region = "us-east-1";
+const backendProps: Omit<S3BackendConfig, "key"> = {
+  region,
+  encrypt: true,
+  bucket: "cdktn-tf-state",
+  dynamodbTable: "cdktn-tf-state-locks",
+  kmsKeyId: "arn:aws:kms:us-east-1:237921648970:key/bb9c9c7b-ed27-48da-8da6-fc08e73c3916",
+}
 
 const allProviders: Record<string, string> = JSON.parse(
   fs.readFileSync(path.join(__dirname, "provider.json"), "utf8"),
@@ -84,12 +95,15 @@ class CdkTerrainProviderStack extends TerraformStack {
       provider: githubProvider,
     });
 
-    // TODO: Set up remote backend (S3?)
-    new RemoteBackend(this, {
-      organization: "cdk-terrain",
-      workspaces: {
-        name: shardedStacks.stacks[name].backend.workspaceName,
-      },
+    // new RemoteBackend(this, {
+    //   organization: "cdk-terrain",
+    //   workspaces: {
+    //     name: shardedStacks.stacks[name].backend.workspaceName,
+    //   },
+    // });
+    new S3Backend(this, {
+      ...backendProps,
+      key: `cdktn-io/cdktn-repository-manager/${shardedStacks.stacks[name].backend.workspaceName}/terraform.tfstate`,
     });
 
     const slackWebhook = new TerraformVariable(this, "slack-webhook", {
@@ -274,12 +288,15 @@ class CustomConstructsStack extends TerraformStack {
       provider: githubProvider,
     });
 
-    // TODO: Set up remote backend (S3?)
-    new RemoteBackend(this, {
-      organization: "cdk-terrain",
-      workspaces: {
-        name: "custom-constructs",
-      },
+    // new RemoteBackend(this, {
+    //   organization: "cdk-terrain",
+    //   workspaces: {
+    //     name: "custom-constructs",
+    //   },
+    // });
+    new S3Backend(this, {
+      ...backendProps,
+      key: "cdktn-io/cdktn-repository-manager/custom-constructs/terraform.tfstate",
     });
     const slackWebhook = new TerraformVariable(this, "slack-webhook", {
       type: "string",

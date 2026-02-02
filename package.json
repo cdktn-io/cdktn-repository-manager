@@ -17,7 +17,11 @@
     "upgrade": "npm i cdktf@latest cdktf-cli@latest",
     "upgrade:next": "npm i cdktf@next cdktf-cli@next",
     "output": "cd cdktf.out && terraform output -json -state ../terraform.tfstate",
-    "repos": "yarn -s output | jq  'with_entries(select(.key|match(\"providerRepos\";\"i\")))[] | .value'"
+    "repos": "yarn -s output | jq  'with_entries(select(.key|match(\"providerRepos\";\"i\")))[] | .value'",
+    "repos:secrets:encrypt": "sops -e cdktf.out/stacks/repos/terraform.tfvars > secrets-encrypted/repos-terraform.tfvars",
+    "repos:secrets:decrypt": "sops -d secrets-encrypted/repos-terraform.tfvars > cdktf.out/stacks/repos/terraform.tfvars",
+    "official:secrets:encrypt": "sops -e cdktf.out/stacks/repos-official-new/terraform.tfvars > secrets-encrypted/official-terraform.tfvars",
+    "official:secrets:decrypt": "sops -d secrets-encrypted/official-terraform.tfvars > cdktf.out/stacks/repos-official-new/terraform.tfvars"
   },
   "engines": {
     "node": ">= 20.9.0"
