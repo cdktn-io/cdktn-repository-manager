@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright IBM Corp. 2020, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 set -e
 
 # Comprehensive script to fix all team references in provider repositories
