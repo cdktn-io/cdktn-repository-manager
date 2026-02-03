@@ -7,6 +7,8 @@
   "dns": "hashicorp/dns@~> 3.2",
   "external": "hashicorp/external@~> 2.1",
   "github": "integrations/github@~> 6.0",
+  "google": "hashicorp/google@~> 6.50.0",
+  "googlebeta": "hashicorp/google-beta@~> 6.50.0",
   "http": "hashicorp/http@~> 3.1",
   "kubernetes": "hashicorp/kubernetes@~> 2.0",
   "local": "hashicorp/local@~> 2.1",
