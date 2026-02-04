@@ -26,6 +26,7 @@ import * as path from "path";
 import { TerraformVariable } from "cdktf";
 import { GithubProvider } from "@cdktf/provider-github/lib/provider";
 import { DataGithubTeam } from "@cdktf/provider-github/lib/data-github-team";
+import { ActionsSecret } from "@cdktf/provider-github/lib/actions-secret";
 
 type StackShards = {
   primaryStack: string;
@@ -111,6 +112,7 @@ class CdkTerrainProviderStack extends TerraformStack {
     if (isPrimaryStack) {
       this.createRepositoryManagerRepo(
         slackWebhook,
+        secrets,
         githubProvider,
         githubTeam,
       );
@@ -202,16 +204,12 @@ class CdkTerrainProviderStack extends TerraformStack {
 
   private createRepositoryManagerRepo(
     slackWebhook: TerraformVariable,
+    secrets: PublishingSecretSet,
     githubProvider: GithubProvider,
     githubTeam: DataGithubTeam,
   ) {
     const selfTokens = [
-      // TODO: Remote Backend credentials (S3)
-      new SecretFromVariable(this, "tf-cloud-token"),
-      // TODO: Only keep GitHub App credentials for automation
       new SecretFromVariable(this, "gh-comment-token"),
-      new SecretFromVariable(this, "gh-app-id"),
-      new SecretFromVariable(this, "gh-app-private-key"),
     ];
 
     const self = new GithubRepository(this, "cdktn-repository-manager", {
@@ -221,6 +219,15 @@ class CdkTerrainProviderStack extends TerraformStack {
     });
 
     selfTokens.forEach((token) => token.for(self.resource, githubProvider));
+    secrets.forAllLanguages(self.resource, githubProvider);
+    self.addSecret("alert-prs-slack-webhook-url");
+
+    new ActionsSecret(self.resource, "secret-slack-webhook", {
+      plaintextValue: slackWebhook.stringValue,
+      secretName: "SLACK_WEBHOOK",
+      repository: self.resource.name,
+      provider: githubProvider,
+    });
 
     new TerraformOutput(this, "selfRepoUrl", {
       value: self.resource.htmlUrl,
