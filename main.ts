@@ -95,12 +95,6 @@ class CdkTerrainProviderStack extends TerraformStack {
       provider: githubProvider,
     });
 
-    // new RemoteBackend(this, {
-    //   organization: "cdk-terrain",
-    //   workspaces: {
-    //     name: shardedStacks.stacks[name].backend.workspaceName,
-    //   },
-    // });
     new S3Backend(this, {
       ...backendProps,
       key: `cdktn-io/cdktn-repository-manager/${shardedStacks.stacks[name].backend.workspaceName}/terraform.tfstate`,
@@ -288,12 +282,6 @@ class CustomConstructsStack extends TerraformStack {
       provider: githubProvider,
     });
 
-    // new RemoteBackend(this, {
-    //   organization: "cdk-terrain",
-    //   workspaces: {
-    //     name: "custom-constructs",
-    //   },
-    // });
     new S3Backend(this, {
       ...backendProps,
       key: "cdktn-io/cdktn-repository-manager/custom-constructs/terraform.tfstate",
