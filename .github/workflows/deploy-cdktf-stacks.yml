@@ -73,6 +73,7 @@ jobs:
       - name: Deploy
         run: "$(yarn bin)/cdktf deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
         env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           CDKTF_LOG_LEVEL: all
 
       - name: Send failures to Slack

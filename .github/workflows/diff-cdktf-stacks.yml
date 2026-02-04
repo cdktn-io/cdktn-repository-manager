@@ -78,6 +78,8 @@ jobs:
           echo "$VARS" > "$STACK_DIR/terraform.tfvars.json"
       - name: Plan
         id: plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           set -o pipefail
           cd cdktf.out/stacks/${{ matrix.stack }}
