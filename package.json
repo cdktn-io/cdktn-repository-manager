@@ -28,10 +28,18 @@
   },
   "dependencies": {
     "@cdktf/provider-github": "^15.0.0",
+    "@cdktf/provider-aws": "^21.22.1",
+    "@cdktf/provider-time": "11.0.0",
+    "@cdktf/provider-archive":"^11.0.0",
+    "@cdktf/provider-cloudinit":"^11.0.0",
+    "@cdktf/provider-docker":"^12.0.2",
+    "@cdktf/provider-tls":"^11.0.0",
     "cdktf": "^0.21.0",
     "cdktf-cli": "^0.21.0",
     "change-case": "~4.1.2",
-    "constructs": "^10.4.2"
+    "constructs": "^10.4.2",
+    "terraconstructs": "0.2.3",
+    "@aws-cdk/region-info": "*"
   },
   "devDependencies": {
     "@types/node": "~20",

@@ -8,6 +8,10 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-shard-matrix:
     runs-on: ubuntu-latest

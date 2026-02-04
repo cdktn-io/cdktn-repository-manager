@@ -15,6 +15,7 @@ import {
   S3Backend,
 } from "cdktf";
 import {
+  GitHubActionsRoleStack,
   GithubRepository,
   GithubRepositoryFromExistingRepository,
   SecretFromVariable,
@@ -408,5 +409,16 @@ stackNames.forEach((stackName) => {
 });
 
 new CustomConstructsStack(app, "custom-constructs", []);
+new GitHubActionsRoleStack(app, "github-actions-role",{
+  environmentName: "CdktnIoRepositories",
+  gridUUID: "repo-manager",
+  providerConfig: {
+    region: "us-east-1",
+  },
+  repoInfo: {
+    githubOrg: "cdktn-io",
+    githubRepo: "cdktn-repository-manager",
+  }
+})
 
 app.synth();

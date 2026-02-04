@@ -15,6 +15,9 @@ jobs:
   terraform:
     name: "Terraform CDK Deploy"
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix: ${{fromJSON(inputs.stacks)}}
@@ -24,11 +27,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::237921648970:role/repo-manager-githubleGitHubActionsRole20260204020651378700000001
+          aws-region: us-east-1
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
         with:
           terraform_version: 1.13.3
-          cli_config_credentials_token: ${{ secrets.TF_CLOUD_TOKEN }}
           terraform_wrapper: false
 
       - name: Setup Node.js
@@ -42,7 +50,6 @@ jobs:
       - name: Deploy
         run: "$(yarn bin)/cdktf deploy --auto-approve '${{ matrix.stack }}'"
         env:
-          TERRAFORM_CLOUD_TOKEN: ${{ secrets.TF_CLOUD_TOKEN }}
           CDKTF_LOG_LEVEL: all
 
       - name: Send failures to Slack

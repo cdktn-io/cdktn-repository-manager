@@ -22,7 +22,7 @@ jobs:
     name: "Upgrade"
     runs-on: ubuntu-latest
     container:
-      image: docker.mirror.hashicorp.services/hashicorp/jsii-terraform
+      image: terraconstructs/jsii-terraform@sha256:4942a4c6ed8286f403c7855dab56b0e11f9a7115e7e0afbcd49d7e69de4d6dc0
     strategy:
       fail-fast: false
       matrix: ${{fromJSON(needs.build-provider-matrix.outputs.matrix)}}
