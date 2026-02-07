@@ -24,6 +24,14 @@ jobs:
       max-parallel: 10
 
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cdktn-io
+
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
@@ -73,7 +81,7 @@ jobs:
       - name: Deploy
         run: "$(yarn bin)/cdktf deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           CDKTF_LOG_LEVEL: all
 
       - name: Send failures to Slack
