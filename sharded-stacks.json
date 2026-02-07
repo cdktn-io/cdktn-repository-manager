@@ -13,6 +13,8 @@
         "docker",
         "external",
         "github",
+        "google",
+        "googlebeta",
         "kubernetes",
         "local",
         "null",
@@ -25,10 +27,7 @@
       "backend": {
         "workspaceName": "prebuilt-providers-official-new"
       },
-      "providers": [
-        "dns",
-        "http"
-      ]
+      "providers": ["dns", "http"]
     },
     "repos-partners": {
       "backend": {
