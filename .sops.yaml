@@ -1,0 +1,6 @@
+# Copyright IBM Corp. 2020, 2026
+# SPDX-License-Identifier: MPL-2.0
+
+# https://github.com/getsops/sops/blob/v3.11.0/README.rst#213using-sopsyaml-conf-to-select-kms-pgp-and-age-for-new-files
+creation_rules:
+    - kms: 'arn:aws:kms:us-east-1:237921648970:key/86f6dc3a-6240-4f08-bb63-e4bbe1d3c4cd,arn:aws:kms:eu-central-1:237921648970:key/5b49cddc-14a2-4119-b86a-169bfb9ac68b'

@@ -8,12 +8,14 @@ import {
   App,
   TerraformStack,
   TerraformOutput,
-  RemoteBackend,
   Annotations,
   Aspects,
   MigrateIds,
+  S3BackendConfig,
+  S3Backend,
 } from "cdktf";
 import {
+  GitHubActionsRoleStack,
   GithubRepository,
   GithubRepositoryFromExistingRepository,
   SecretFromVariable,
@@ -24,6 +26,7 @@ import * as path from "path";
 import { TerraformVariable } from "cdktf";
 import { GithubProvider } from "@cdktf/provider-github/lib/provider";
 import { DataGithubTeam } from "@cdktf/provider-github/lib/data-github-team";
+import { ActionsSecret } from "@cdktf/provider-github/lib/actions-secret";
 
 type StackShards = {
   primaryStack: string;
@@ -36,6 +39,16 @@ type StackShards = {
     };
   };
 };
+
+// TODO: Remove hardcoded s3 backend props
+const region = "us-east-1";
+const backendProps: Omit<S3BackendConfig, "key"> = {
+  region,
+  encrypt: true,
+  bucket: "cdktn-tf-state",
+  dynamodbTable: "cdktn-tf-state-locks",
+  kmsKeyId: "arn:aws:kms:us-east-1:237921648970:key/bb9c9c7b-ed27-48da-8da6-fc08e73c3916",
+}
 
 const allProviders: Record<string, string> = JSON.parse(
   fs.readFileSync(path.join(__dirname, "provider.json"), "utf8"),
@@ -84,12 +97,9 @@ class CdkTerrainProviderStack extends TerraformStack {
       provider: githubProvider,
     });
 
-    // TODO: Set up remote backend (S3?)
-    new RemoteBackend(this, {
-      organization: "cdk-terrain",
-      workspaces: {
-        name: shardedStacks.stacks[name].backend.workspaceName,
-      },
+    new S3Backend(this, {
+      ...backendProps,
+      key: `cdktn-io/cdktn-repository-manager/${shardedStacks.stacks[name].backend.workspaceName}/terraform.tfstate`,
     });
 
     const slackWebhook = new TerraformVariable(this, "slack-webhook", {
@@ -102,6 +112,7 @@ class CdkTerrainProviderStack extends TerraformStack {
     if (isPrimaryStack) {
       this.createRepositoryManagerRepo(
         slackWebhook,
+        secrets,
         githubProvider,
         githubTeam,
       );
@@ -193,16 +204,12 @@ class CdkTerrainProviderStack extends TerraformStack {
 
   private createRepositoryManagerRepo(
     slackWebhook: TerraformVariable,
+    secrets: PublishingSecretSet,
     githubProvider: GithubProvider,
     githubTeam: DataGithubTeam,
   ) {
     const selfTokens = [
-      // TODO: Remote Backend credentials (S3)
-      new SecretFromVariable(this, "tf-cloud-token"),
-      // TODO: Only keep GitHub App credentials for automation
       new SecretFromVariable(this, "gh-comment-token"),
-      new SecretFromVariable(this, "gh-app-id"),
-      new SecretFromVariable(this, "gh-app-private-key"),
     ];
 
     const self = new GithubRepository(this, "cdktn-repository-manager", {
@@ -212,6 +219,15 @@ class CdkTerrainProviderStack extends TerraformStack {
     });
 
     selfTokens.forEach((token) => token.for(self.resource, githubProvider));
+    secrets.forAllLanguages(self.resource, githubProvider);
+    self.addSecret("alert-prs-slack-webhook-url");
+
+    new ActionsSecret(self.resource, "secret-slack-webhook", {
+      plaintextValue: slackWebhook.stringValue,
+      secretName: "SLACK_WEBHOOK",
+      repository: self.resource.name,
+      provider: githubProvider,
+    });
 
     new TerraformOutput(this, "selfRepoUrl", {
       value: self.resource.htmlUrl,
@@ -274,12 +290,9 @@ class CustomConstructsStack extends TerraformStack {
       provider: githubProvider,
     });
 
-    // TODO: Set up remote backend (S3?)
-    new RemoteBackend(this, {
-      organization: "cdk-terrain",
-      workspaces: {
-        name: "custom-constructs",
-      },
+    new S3Backend(this, {
+      ...backendProps,
+      key: "cdktn-io/cdktn-repository-manager/custom-constructs/terraform.tfstate",
     });
     const slackWebhook = new TerraformVariable(this, "slack-webhook", {
       type: "string",
@@ -403,5 +416,16 @@ stackNames.forEach((stackName) => {
 });
 
 new CustomConstructsStack(app, "custom-constructs", []);
+new GitHubActionsRoleStack(app, "github-actions-role",{
+  environmentName: "CdktnIoRepositories",
+  gridUUID: "repo-manager",
+  providerConfig: {
+    region: "us-east-1",
+  },
+  repoInfo: {
+    githubOrg: "cdktn-io",
+    githubRepo: "cdktn-repository-manager",
+  }
+})
 
 app.synth();

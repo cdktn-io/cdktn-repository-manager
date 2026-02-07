@@ -3,6 +3,11 @@ name: "Plan"
 on: [pull_request]
 concurrency: ${{ github.workflow }}-${{ github.head_ref }}
 
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
 jobs:
   build-shard-matrix:
     runs-on: ubuntu-latest

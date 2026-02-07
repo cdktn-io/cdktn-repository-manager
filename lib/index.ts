@@ -5,3 +5,4 @@
 
 export * from "./repository";
 export * from "./secrets";
+export * from "./gh-actions-role";

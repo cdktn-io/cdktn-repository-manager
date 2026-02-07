@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright IBM Corp. 2020, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 # Bootstrap script for Amazon Linux 2023 (ARM64) to migrate large CDKTN provider repositories
 #
 # Usage:

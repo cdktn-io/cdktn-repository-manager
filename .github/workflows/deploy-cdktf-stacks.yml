@@ -15,20 +15,36 @@ jobs:
   terraform:
     name: "Terraform CDK Deploy"
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix: ${{fromJSON(inputs.stacks)}}
       max-parallel: 10
 
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cdktn-io
+
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::237921648970:role/repo-manager-githubleGitHubActionsRole20260204020651378700000001
+          aws-region: us-east-1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
         with:
           terraform_version: 1.13.3
-          cli_config_credentials_token: ${{ secrets.TF_CLOUD_TOKEN }}
           terraform_wrapper: false
 
       - name: Setup Node.js
@@ -39,10 +55,33 @@ jobs:
       - name: Install
         run: yarn install
 
-      - name: Deploy
-        run: "$(yarn bin)/cdktf deploy --auto-approve '${{ matrix.stack }}'"
+      - name: Synth
+        run: "$(yarn bin)/cdktf synth"
+
+      - name: Write Terraform variables
         env:
-          TERRAFORM_CLOUD_TOKEN: ${{ secrets.TF_CLOUD_TOKEN }}
+          VAR_GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          VAR_GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          VAR_GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          VAR_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VAR_SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          VAR_TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+          VAR_TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+          VAR_GH_COMMENT_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
+          VAR_ALERT_PRS_SLACK_WEBHOOK_URL: ${{ secrets.ALERT_PRS_SLACK_WEBHOOK_URL }}
+        run: |
+          STACK_DIR="cdktf.out/stacks/${{ matrix.stack }}"
+          VARS="{}"
+          for var in $(jq -r '.variable | keys[]' "$STACK_DIR/cdk.tf.json"); do
+            ENV_NAME="VAR_$(echo "$var" | tr 'a-z-' 'A-Z_')"
+            VARS=$(echo "$VARS" | jq --arg key "$var" --arg val "${!ENV_NAME}" '. + {($key): $val}')
+          done
+          echo "$VARS" > "$STACK_DIR/terraform.tfvars.json"
+
+      - name: Deploy
+        run: "$(yarn bin)/cdktf deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           CDKTF_LOG_LEVEL: all
 
       - name: Send failures to Slack

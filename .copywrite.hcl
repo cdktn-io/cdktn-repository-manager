@@ -8,6 +8,7 @@ project {
   # Supports doublestar glob patterns for more flexibility in defining which
   # files or folders should be ignored
   header_ignore = [
+    "secrets-encrypted/**",
     # "vendors/**",
     # "**autogen**",
   ]
