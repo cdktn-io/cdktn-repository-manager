@@ -1,0 +1,263 @@
+name: "Import Apply (/migrate)"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  migrate:
+    name: "Terraform Apply + Migrate"
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/migrate')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Add reaction to acknowledge
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const branch = pr.data.head.ref;
+            core.setOutput('branch', branch);
+            core.setOutput('sha', pr.data.head.sha);
+
+            // Guard: branch must match import/*
+            if (!branch.startsWith('import/')) {
+              core.setFailed(`Branch '${branch}' does not match 'import/*' pattern. /migrate only works on import PRs.`);
+              return;
+            }
+
+            // Extract provider name from branch
+            const provider = branch.replace('import/', '');
+            core.setOutput('provider', provider);
+
+            // Guard: PR must be approved
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            const approved = reviews.data.some(r => r.state === 'APPROVED');
+            if (!approved) {
+              core.setFailed('PR must be approved before running /migrate.');
+              return;
+            }
+
+            // Guard: commenter must have write access
+            const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.comment.user.login
+            });
+            const level = permission.data.permission;
+            if (!['admin', 'write'].includes(level)) {
+              core.setFailed(`User ${context.payload.comment.user.login} does not have write access (has: ${level}).`);
+              return;
+            }
+
+            core.info(`Provider: ${provider}`);
+            core.info(`Branch: ${branch}`);
+            core.info(`Commenter: ${context.payload.comment.user.login} (${level})`);
+            core.info(`PR approved: yes`);
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cdktn-io
+
+      - name: Checkout PR branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ steps.pr.outputs.branch }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Determine stack
+        id: stack
+        run: |
+          PROVIDER="${{ steps.pr.outputs.provider }}"
+          STACK=$(jq -r --arg p "$PROVIDER" '
+            .stacks | to_entries[] | select(.value.providers | index($p)) | .key
+          ' sharded-stacks.json)
+
+          if [ -z "$STACK" ]; then
+            echo "::error::Provider '$PROVIDER' not found in any shard in sharded-stacks.json."
+            exit 1
+          fi
+
+          echo "stack=$STACK" >> "$GITHUB_OUTPUT"
+          echo "Provider: $PROVIDER, Stack: $STACK"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::237921648970:role/repo-manager-githubleGitHubActionsRole20260204020651378700000001
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: 1.13.3
+          terraform_wrapper: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Synth
+        run: "$(yarn bin)/cdktf synth"
+
+      - name: Write Terraform variables
+        env:
+          VAR_GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          VAR_GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          VAR_GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          VAR_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VAR_SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          VAR_TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+          VAR_TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+          VAR_GH_COMMENT_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
+          VAR_ALERT_PRS_SLACK_WEBHOOK_URL: ${{ secrets.ALERT_PRS_SLACK_WEBHOOK_URL }}
+        run: |
+          STACK_DIR="cdktf.out/stacks/${{ steps.stack.outputs.stack }}"
+          VARS="{}"
+          for var in $(jq -r '.variable | keys[]' "$STACK_DIR/cdk.tf.json"); do
+            ENV_NAME="VAR_$(echo "$var" | tr 'a-z-' 'A-Z_')"
+            VARS=$(echo "$VARS" | jq --arg key "$var" --arg val "${!ENV_NAME}" '. + {($key): $val}')
+          done
+          echo "$VARS" > "$STACK_DIR/terraform.tfvars.json"
+
+      - name: Terraform init
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          cd "cdktf.out/stacks/${{ steps.stack.outputs.stack }}"
+          terraform init
+
+      - name: Terraform apply
+        id: apply
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          CDKTF_LOG_LEVEL: all
+        run: |
+          cd "cdktf.out/stacks/${{ steps.stack.outputs.stack }}"
+          terraform apply -auto-approve 2>&1 | tee /tmp/tf-apply-output.txt
+
+      - name: Remove provider from pending-imports
+        if: success()
+        run: |
+          PROVIDER="${{ steps.pr.outputs.provider }}"
+
+          # Remove provider from pending-imports.json
+          jq --arg p "$PROVIDER" 'map(select(. != $p))' pending-imports.json > pending-imports.json.tmp
+          mv pending-imports.json.tmp pending-imports.json
+
+          # Get app identity for commit
+          APP_SLUG="${{ steps.app-token.outputs.app-slug }}"
+          APP_USER_ID=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)
+
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git add pending-imports.json
+          git commit -m "chore: remove ${PROVIDER} from pending-imports (import complete)"
+          git push origin "${{ steps.pr.outputs.branch }}"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Dispatch migrate-provider workflow
+        if: success()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh workflow run migrate-provider.yml -f provider=${{ steps.pr.outputs.provider }}
+          echo "✅ Dispatched migrate-provider workflow for ${{ steps.pr.outputs.provider }}"
+
+      - name: Post success comment
+        if: success()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const provider = '${{ steps.pr.outputs.provider }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `## ✅ /migrate completed successfully`,
+                '',
+                `**Provider:** \`${provider}\``,
+                `**Stack:** \`${{ steps.stack.outputs.stack }}\``,
+                '',
+                '### What happened:',
+                '1. Terraform apply imported the repositories into state and configured them',
+                '2. `pending-imports.json` has been updated (import entry removed)',
+                `3. \`migrate-provider\` workflow has been dispatched for \`${provider}\``,
+                '',
+                '### Next steps:',
+                `- Monitor the [migrate-provider workflow](https://github.com/cdktn-io/cdktn-repository-manager/actions/workflows/migrate-provider.yml) for \`${provider}\``,
+                `- Once the migration PR merges in \`cdktn-provider-${provider}\`, merge this PR`,
+                `- If needed, trigger \`force-release\` on \`cdktn-provider-${provider}\` for initial publish`,
+              ].join('\n')
+            });
+
+      - name: Post failure comment
+        if: failure()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const provider = '${{ steps.pr.outputs.provider }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `## ❌ /migrate failed`,
+                '',
+                `**Provider:** \`${provider}\``,
+                '',
+                `See the [workflow run](${runUrl}) for details.`,
+                '',
+                'You can retry by commenting `/migrate` again after fixing the issue.',
+              ].join('\n')
+            });
+
+      - name: Send failures to Slack
+        if: ${{ failure() && !cancelled() }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.FAILURE_SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "provider_name": "import-apply ${{ steps.pr.outputs.provider }}",
+              "run_url": "https://github.com/cdktn-io/cdktn-repository-manager/actions/runs/${{ github.run_id }}"
+            }
