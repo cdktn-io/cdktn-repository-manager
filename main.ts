@@ -132,8 +132,7 @@ class CdkTerrainProviderStack extends TerraformStack {
 
     const providerRepos: GitUrls[] = Object.keys(providers).map((provider) => {
       const repo = new GithubRepository(this, `cdktn-provider-${provider}`, {
-        // TODO: Rename once cdktn core has been published
-        description: `Prebuilt Terraform CDK (cdktf) provider for ${provider}.`,
+        description: `Prebuilt CDK Terrain (cdktn) provider for ${provider}.`,
         topics: [...GithubRepository.defaultTopics, provider],
         team: githubTeam,
         protectMain: true,
@@ -153,8 +152,7 @@ class CdkTerrainProviderStack extends TerraformStack {
 
       // repo to publish go packages to
       const goRepo = new GithubRepository(this, `cdktn-provider-${provider}-go`, {
-        // TODO: Rename once cdktn core has been published
-        description: `CDK for Terraform Go provider bindings for ${provider}.`,
+        description: `CDK Terrain Go provider bindings for ${provider}.`,
         topics: [...GithubRepository.defaultTopics, provider],
         team: githubTeam,
         protectMain: false,
@@ -356,8 +354,7 @@ class CustomConstructsStack extends TerraformStack {
 
         // repo to publish go packages to
         new GithubRepository(this, `${repoName}-go`, {
-          // TODO: Rename when cdktn core is published
-          description: `CDK for Terraform Go bindings for ${repoName}.`,
+          description: `CDK Terrain Go bindings for ${repoName}.`,
           topics,
           team: githubTeam,
           protectMain: false,

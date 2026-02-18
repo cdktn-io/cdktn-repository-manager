@@ -125,6 +125,9 @@ export class GithubRepository extends Construct {
   public readonly resource: Repository;
   private readonly provider: GithubProvider;
   public static defaultTopics = [
+    "cdktn",
+    "cdk-terrain",
+    "opentofu",
     "cdktf",
     "terraform",
     "terraform-cdk",
@@ -138,7 +141,7 @@ export class GithubRepository extends Construct {
 
     const {
       topics = GithubRepository.defaultTopics,
-      description = "Repository management for prebuilt cdktf providers via cdktf",
+      description = "Repository management for prebuilt CDK Terrain providers",
       provider,
     } = config;
     this.provider = provider;
@@ -148,7 +151,7 @@ export class GithubRepository extends Construct {
       description,
       archiveOnDestroy: true,
       visibility: "public",
-      homepageUrl: "https://cdk.tf",
+      homepageUrl: "https://cdktn.io",
       hasIssues: !name.endsWith("-go"),
       hasWiki: false,
       autoInit: true,
