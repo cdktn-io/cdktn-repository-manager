@@ -60,6 +60,9 @@ jobs:
           sed -i 's/CdktfProviderProject/CdktnProviderProject/g' .projenrc.js
           sed -i "s/isDeprecated: true,/isDeprecated: false,/" .projenrc.js
 
+          # Update minNodeVersion to satisfy @cdktn/provider-project engine requirement (>= 20.16.0)
+          sed -i 's/minNodeVersion: "20\.9\.0"/minNodeVersion: "20.16.0"/' .projenrc.js
+
           # Verify changes were made
           grep -q "@cdktn/provider-project" .projenrc.js || {
             echo "Error: Migration failed - @cdktn/provider-project not found"
