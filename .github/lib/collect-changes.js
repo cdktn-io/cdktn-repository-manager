@@ -6,13 +6,22 @@
 const fs = require("fs");
 const path = require("path");
 
-const v = (key, input) =>
-  new RegExp(`${key}:[\\D]*(\\d+(\\.\\d+)*)`).exec(input)[1];
+const v = (key, input) => {
+  const match = new RegExp(`${key}:[\\D]*(\\d+(\\.\\d+)*)`).exec(input);
+  if (match) return match[1];
+  // During cdktf->cdktn transition the old file may still use cdktfVersion
+  if (key === "cdktnVersion") {
+    const fallback = /cdktfVersion:[\D]*(\d+(\.\d+)*)/.exec(input);
+    if (fallback) return fallback[1];
+  }
+  return null;
+};
 
 const terraformProviderName = (input) =>
   new RegExp(`terraformProvider:\\s("|')(.*)@`).exec(input)[2];
 
 const parse = (version) => {
+  if (!version) return { major: 0, minor: 0, patch: 0 };
   const parts = version.split(".");
   return {
     major: Number(parts[0]),
