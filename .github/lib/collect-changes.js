@@ -77,7 +77,7 @@ module.exports = async ({ core, exec }) => {
 
   const results = [
     "terraformProvider",
-    "cdktfVersion",
+    "cdktnVersion",
     "constructsVersion",
     "minNodeVersion",
     "jsiiVersion",
@@ -125,8 +125,8 @@ module.exports = async ({ core, exec }) => {
         name = `provider version`;
         prefix = `${hasBreakingChanges ? "feat!" : "fix"}: update `;
         break;
-      case "cdktfVersion":
-        name = `CDKTF version`;
+      case "cdktnVersion":
+        name = `CDKTN version`;
         prefix = `${hasBreakingChanges ? "feat!" : "fix"}: update `;
         break;
       case "constructsVersion":

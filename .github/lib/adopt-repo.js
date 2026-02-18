@@ -200,6 +200,11 @@ async function main() {
   console.log(`📦 Adopting repository: ${ORG}/${repoName}`);
   console.log("");
 
+  // Configure git to use the GH_TOKEN for HTTPS authentication.
+  // Required so that `git push` inside the cloned temp directories works
+  // without an interactive credential prompt (which fails in CI).
+  execSync("gh auth setup-git", { stdio: "pipe" });
+
   // Verify the repo exists
   try {
     execSync(`gh api /repos/${ORG}/${repoName} --jq .name`, { stdio: "pipe" });
