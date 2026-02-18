@@ -181,6 +181,10 @@ export class GithubRepository extends Construct {
     const variable = new SecretFromVariable(this, name);
     variable.for(this.resource, this.provider);
   }
+
+  importFrom(id: string) {
+    this.resource.importFrom(id);
+  }
 }
 
 export class GithubRepositoryFromExistingRepository extends Construct {

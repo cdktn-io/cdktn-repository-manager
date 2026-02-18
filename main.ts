@@ -58,6 +58,10 @@ const shardedStacks: StackShards = JSON.parse(
   fs.readFileSync(path.join(__dirname, "sharded-stacks.json"), "utf8"),
 );
 
+const pendingImports: string[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "pending-imports.json"), "utf8"),
+);
+
 interface GitUrls {
   html: string;
   ssh: string;
@@ -148,7 +152,7 @@ class CdkTerrainProviderStack extends TerraformStack {
       });
 
       // repo to publish go packages to
-      new GithubRepository(this, `cdktn-provider-${provider}-go`, {
+      const goRepo = new GithubRepository(this, `cdktn-provider-${provider}-go`, {
         // TODO: Rename once cdktn core has been published
         description: `CDK for Terraform Go provider bindings for ${provider}.`,
         topics: [...GithubRepository.defaultTopics, provider],
@@ -157,6 +161,11 @@ class CdkTerrainProviderStack extends TerraformStack {
         webhookUrl: slackWebhook.stringValue,
         provider: githubProvider,
       });
+
+      if (pendingImports.includes(provider)) {
+        repo.importFrom(`cdktn-provider-${provider}`);
+        goRepo.importFrom(`cdktn-provider-${provider}-go`);
+      }
 
       secrets.forAllLanguages(repo.resource, githubProvider);
       repo.addSecret("alert-prs-slack-webhook-url");

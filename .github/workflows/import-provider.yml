@@ -1,0 +1,258 @@
+name: "Import Provider Repository"
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: >-
+          Provider name (e.g., "vault", "helm", "cloudflare").
+          Must exist in original-providers.json and NOT already be in provider.json.
+          Both cdktn-provider-<name> and cdktn-provider-<name>-go repos must
+          already exist in cdktn-io org (created via https://github.com/new/import).
+        required: true
+        type: string
+
+jobs:
+  import-provider:
+    name: "Import ${{ inputs.provider }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cdktn-io
+
+      - name: Get GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Validate provider and determine stack
+        id: validate
+        run: |
+          PROVIDER="${{ inputs.provider }}"
+
+          # Must exist in original-providers.json
+          if ! jq -e --arg p "$PROVIDER" '.[$p]' original-providers.json > /dev/null 2>&1; then
+            echo "::error::Unknown provider '$PROVIDER'. Must be a key in original-providers.json."
+            echo "Available providers:"
+            jq -r 'keys[]' original-providers.json
+            exit 1
+          fi
+
+          # Must NOT already be in current provider.json
+          if jq -e --arg p "$PROVIDER" '.[$p]' provider.json > /dev/null 2>&1; then
+            echo "::error::Provider '$PROVIDER' is already in provider.json (already imported)."
+            exit 1
+          fi
+
+          # Get the version string from original list
+          VERSION=$(jq -r --arg p "$PROVIDER" '.[$p]' original-providers.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Determine which shard this provider belongs to
+          STACK=$(jq -r --arg p "$PROVIDER" '
+            .stacks | to_entries[] | select(.value.providers | index($p)) | .key
+          ' original-sharded-stacks.json)
+
+          if [ -z "$STACK" ]; then
+            echo "::error::Provider '$PROVIDER' not found in any shard in original-sharded-stacks.json."
+            exit 1
+          fi
+
+          echo "stack=$STACK" >> "$GITHUB_OUTPUT"
+          echo "provider=$PROVIDER" >> "$GITHUB_OUTPUT"
+
+          echo "Provider: $PROVIDER"
+          echo "Version: $VERSION"
+          echo "Stack: $STACK"
+
+      - name: Check target repositories exist
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PROVIDER="${{ steps.validate.outputs.provider }}"
+          MAIN_REPO="cdktn-provider-${PROVIDER}"
+          GO_REPO="cdktn-provider-${PROVIDER}-go"
+
+          FAILED=false
+
+          # Check main repo
+          if gh api "/repos/cdktn-io/${MAIN_REPO}" --jq .name > /dev/null 2>&1; then
+            echo "✅ ${MAIN_REPO} exists"
+          else
+            echo "::error::Repository cdktn-io/${MAIN_REPO} does not exist."
+            echo ""
+            echo "Please import it first:"
+            echo "  1. Go to https://github.com/new/import"
+            echo "  2. Source: https://github.com/cdktf/cdktf-provider-${PROVIDER}"
+            echo "  3. Owner: cdktn-io"
+            echo "  4. Name: ${MAIN_REPO}"
+            echo "  5. Visibility: Public"
+            FAILED=true
+          fi
+
+          # Check go repo
+          if gh api "/repos/cdktn-io/${GO_REPO}" --jq .name > /dev/null 2>&1; then
+            echo "✅ ${GO_REPO} exists"
+          else
+            echo "::error::Repository cdktn-io/${GO_REPO} does not exist."
+            echo ""
+            echo "Please import it first:"
+            echo "  1. Go to https://github.com/new/import"
+            echo "  2. Source: https://github.com/cdktf/cdktf-provider-${PROVIDER}-go"
+            echo "  3. Owner: cdktn-io"
+            echo "  4. Name: ${GO_REPO}"
+            echo "  5. Visibility: Public"
+            FAILED=true
+          fi
+
+          if [ "$FAILED" = true ]; then
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "20"
+
+      - name: Adopt main repository
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node .github/lib/adopt-repo.js "cdktn-provider-${{ steps.validate.outputs.provider }}"
+
+      - name: Adopt Go repository
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node .github/lib/adopt-repo.js "cdktn-provider-${{ steps.validate.outputs.provider }}-go"
+
+      - name: Configure git identity
+        run: |
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+
+      - name: Create import branch and update config files
+        id: branch
+        run: |
+          PROVIDER="${{ steps.validate.outputs.provider }}"
+          VERSION="${{ steps.validate.outputs.version }}"
+          STACK="${{ steps.validate.outputs.stack }}"
+          BRANCH="import/${PROVIDER}"
+
+          git checkout -b "$BRANCH"
+
+          # Add provider to provider.json (sorted)
+          jq --arg p "$PROVIDER" --arg v "$VERSION" --sort-keys '. + {($p): $v}' provider.json > provider.json.tmp
+          mv provider.json.tmp provider.json
+
+          # Add provider to sharded-stacks.json in the correct shard (sorted)
+          jq --arg p "$PROVIDER" --arg s "$STACK" '
+            .stacks[$s].providers += [$p] | .stacks[$s].providers |= sort
+          ' sharded-stacks.json > sharded-stacks.json.tmp
+          mv sharded-stacks.json.tmp sharded-stacks.json
+
+          # Add provider to pending-imports.json (sorted, deduplicated)
+          jq --arg p "$PROVIDER" '. + [$p] | unique | sort' pending-imports.json > pending-imports.json.tmp
+          mv pending-imports.json.tmp pending-imports.json
+
+          git add provider.json sharded-stacks.json pending-imports.json
+          git commit -m "feat: import provider ${PROVIDER}
+
+          Add ${PROVIDER} to provider.json (stack: ${STACK}) and mark for Terraform import.
+
+          Source: cdktf/cdktf-provider-${PROVIDER}
+          Target: cdktn-io/cdktn-provider-${PROVIDER}
+          Version: ${VERSION}"
+
+          git push origin "$BRANCH"
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PROVIDER="${{ steps.validate.outputs.provider }}"
+          STACK="${{ steps.validate.outputs.stack }}"
+          VERSION="${{ steps.validate.outputs.version }}"
+
+          gh pr create \
+            --title "feat: import provider ${PROVIDER}" \
+            --body "$(cat <<'EOF'
+          ## Summary
+
+          Import `cdktn-provider-PROVIDER_PLACEHOLDER` from the archived cdktf org into the cdktn-io infrastructure.
+
+          **Provider:** `PROVIDER_PLACEHOLDER`
+          **Version:** `VERSION_PLACEHOLDER`
+          **Stack:** `STACK_PLACEHOLDER`
+
+          ## What this PR does
+
+          - Adds `PROVIDER_PLACEHOLDER` to `provider.json` with version `VERSION_PLACEHOLDER`
+          - Adds `PROVIDER_PLACEHOLDER` to the `STACK_PLACEHOLDER` shard in `sharded-stacks.json`
+          - Adds `PROVIDER_PLACEHOLDER` to `pending-imports.json` (triggers Terraform import blocks)
+
+          ## Pre-import checklist
+
+          The import workflow has already:
+          - [x] Verified `cdktn-provider-PROVIDER_PLACEHOLDER` exists in cdktn-io org
+          - [x] Verified `cdktn-provider-PROVIDER_PLACEHOLDER-go` exists in cdktn-io org
+          - [x] Fixed CODEOWNERS team references on main
+          - [x] Fixed workflow team references on main
+          - [x] Ensured `main` is the default branch
+          - [x] Enabled GitHub Actions
+
+          ## Review checklist
+
+          - [ ] Terraform plan (posted by CI) shows import blocks and expected resource configuration
+          - [ ] No unexpected resource deletions or modifications in the plan
+
+          ## Next steps
+
+          1. **Review** the Terraform plan posted by CI on this PR
+          2. **Approve** this PR
+          3. **Comment `/migrate`** to trigger Terraform apply + provider migration
+             - This will import the repos into Terraform state and configure branch protection, secrets, etc.
+             - After apply succeeds, it will automatically dispatch the `migrate-provider` workflow
+             - The migration creates a PR in the provider repo to switch to `@cdktn` scope
+          4. **Merge** this PR after `/migrate` succeeds
+          5. **Trigger `force-release`** on the provider repo if the migration PR didn't auto-release
+          EOF
+          )" \
+            --head "import/${PROVIDER}" \
+            --base main
+
+          # Replace placeholders in PR body
+          PR_NUMBER=$(gh pr view "import/${PROVIDER}" --json number --jq .number)
+          BODY=$(gh pr view "$PR_NUMBER" --json body --jq .body)
+          BODY="${BODY//PROVIDER_PLACEHOLDER/$PROVIDER}"
+          BODY="${BODY//VERSION_PLACEHOLDER/$VERSION}"
+          BODY="${BODY//STACK_PLACEHOLDER/$STACK}"
+          gh pr edit "$PR_NUMBER" --body "$BODY"
+
+      - name: Send failures to Slack
+        if: ${{ failure() && !cancelled() }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.FAILURE_SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "provider_name": "import-provider ${{ inputs.provider }}",
+              "run_url": "https://github.com/cdktn-io/cdktn-repository-manager/actions/runs/${{ github.run_id }}"
+            }
