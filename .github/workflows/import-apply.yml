@@ -197,7 +197,9 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh workflow run migrate-provider.yml -f provider=${{ steps.pr.outputs.provider }}
+          gh workflow run migrate-provider.yml \
+            -f provider=${{ steps.pr.outputs.provider }} \
+            -f import_pr_number=${{ github.event.issue.number }}
           echo "✅ Dispatched migrate-provider workflow for ${{ steps.pr.outputs.provider }}"
 
       - name: Post success comment
@@ -222,8 +224,8 @@ jobs:
                 `3. \`migrate-provider\` workflow has been dispatched for \`${provider}\``,
                 '',
                 '### Next steps:',
-                `- Monitor the [migrate-provider workflow](https://github.com/cdktn-io/cdktn-repository-manager/actions/workflows/migrate-provider.yml) for \`${provider}\``,
-                `- Once the migration PR merges in \`cdktn-provider-${provider}\`, merge this PR`,
+                `- The \`migrate-provider\` workflow has been dispatched — a follow-up comment will be posted here once the migration PR is opened in \`cdktn-provider-${provider}\``,
+                `- Once the migration PR merges, merge this PR`,
                 `- If needed, trigger \`force-release\` on \`cdktn-provider-${provider}\` for initial publish`,
               ].join('\n')
             });

@@ -6,6 +6,10 @@ on:
         description: 'Provider name (key from provider.json, e.g., "aws", "google", "random")'
         required: true
         type: string
+      import_pr_number:
+        description: 'PR number in cdktn-repository-manager that triggered this migration (for posting back a status comment)'
+        required: false
+        type: string
 
 jobs:
   migrate-provider-repo:
@@ -132,6 +136,34 @@ jobs:
           gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Post status comment on import PR
+        if: inputs.import_pr_number != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const migrationPrNumber = '${{ steps.cpr.outputs.pull-request-number }}';
+            const migrationPrUrl = '${{ steps.cpr.outputs.pull-request-url }}';
+            const provider = '${{ inputs.provider }}';
+            const body = migrationPrNumber
+              ? [
+                  `## 🔀 Migration PR opened for \`${provider}\``,
+                  '',
+                  `The [migration PR](${migrationPrUrl}) has been opened in \`cdktn-provider-${provider}\` and auto-merge is enabled.`,
+                  '',
+                  '### Next steps:',
+                  `- Once the migration PR merges, merge this PR`,
+                  `- If needed, trigger \`force-release\` on \`cdktn-provider-${provider}\` for initial publish`,
+                ].join('\n')
+              : `## ⚠️ Migration workflow ran for \`${provider}\` but no PR was created (it may already exist on \`auto/migrate-to-cdktn-scope\`).`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt('${{ inputs.import_pr_number }}'),
+              body,
+            });
 
       - name: Send failures to Slack
         if: ${{ failure() && !cancelled() }}
