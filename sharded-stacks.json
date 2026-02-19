@@ -8,6 +8,7 @@
       "providers": [
         "archive",
         "aws",
+        "azuread",
         "azurerm",
         "cloudinit",
         "docker",
