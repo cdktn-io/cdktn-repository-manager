@@ -83,10 +83,9 @@ The `/migrate` comment triggers `import-apply.yml`, which:
 1. Validates the PR is approved and the commenter has write access
 2. Runs `terraform apply` on the relevant stack shard — importing both repos into Terraform state and applying all configuration (branch protection, secrets, team permissions, labels, webhooks)
 3. Removes `<name>` from `pending-imports.json` and commits to the branch
-4. Queues the import PR for auto-merge (squash)
-5. Posts a success comment on the PR
+4. Posts a success comment on the PR with instructions to merge
 
-The import PR then merges automatically once all required checks pass.
+**Merge this PR** once the success comment appears.
 
 ---
 
@@ -131,11 +130,11 @@ Contributor          import-provider         import-apply          deploy + upgr
     |                       |                     | validate guards      |                        |
     |                       |                     | terraform apply      |                        |
     |                       |                     | update pending-imports                        |
-    |                       |                     | queue auto-merge     |                        |
     |                       |                     | post success comment |                        |
     |<--------------------------------------------------------------------|                        |
     |                       |                     |                      |                        |
-    |                       |          import PR auto-merges to main     |                        |
+    | Maintainer merges     |                     |                      |                        |
+    | import PR             |                     |                      |                        |
     |                       |                     |                      |                        |
     |                       |                     |            deploy.yml triggers                |
     |                       |                     |            terraform apply (idempotent)        |

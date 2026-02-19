@@ -192,17 +192,6 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      - name: Auto-merge import PR
-        if: success()
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          gh pr merge ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --squash \
-            --auto
-          echo "✅ Import PR queued for auto-merge"
-
       - name: Post success comment
         if: success()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -222,13 +211,9 @@ jobs:
                 '### What happened:',
                 '1. Terraform apply imported the repositories into state and configured them',
                 '2. `pending-imports.json` has been updated (import entry removed)',
-                '3. Import PR has been queued for auto-merge',
                 '',
-                '### What happens next (automatic):',
-                `- Once this PR merges, \`deploy.yml\` will run → \`upgrade-repositories.yml\` will migrate \`cdktn-provider-${provider}\` to \`@cdktn/provider-project\` and open a migration PR`,
-                '- The migration PR will auto-merge and trigger a release',
-                '',
-                'No further action needed.',
+                '### Next step:',
+                `**Merge this PR.** Once merged, \`upgrade-repositories.yml\` will automatically migrate \`cdktn-provider-${provider}\` to \`@cdktn/provider-project\` and open a migration PR that will auto-merge and trigger a release.`,
               ].join('\n')
             });
 
