@@ -1,6 +1,7 @@
 {
   "archive": "hashicorp/archive@~> 2.2",
   "aws": "hashicorp/aws@~> 6.0",
+  "azuread": "hashicorp/azuread@~> 3.0",
   "azurerm": "azurerm@~> 4.0",
   "cloudinit": "hashicorp/cloudinit@~> 2.2",
   "dns": "hashicorp/dns@~> 3.2",
