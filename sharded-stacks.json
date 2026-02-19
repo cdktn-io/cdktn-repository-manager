@@ -10,6 +10,7 @@
         "aws",
         "azuread",
         "azurerm",
+        "cloudflare",
         "cloudinit",
         "docker",
         "external",
