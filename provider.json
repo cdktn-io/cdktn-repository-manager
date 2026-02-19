@@ -11,6 +11,7 @@
   "github": "integrations/github@~> 6.0",
   "google": "hashicorp/google@~> 6.50.0",
   "googlebeta": "hashicorp/google-beta@~> 6.50.0",
+  "hcp": "hcp@~> 0.45",
   "helm": "helm@~> 3.0",
   "http": "hashicorp/http@~> 3.1",
   "kubernetes": "hashicorp/kubernetes@~> 2.0",
