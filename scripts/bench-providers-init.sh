@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # bench-providers-init.sh
 #
 # Downloads provider binaries via `terraform init` for a given set of providers
