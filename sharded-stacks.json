@@ -6,6 +6,7 @@
         "workspaceName": "prebuilt-providers"
       },
       "providers": [
+        "acme",
         "archive",
         "aws",
         "azuread",
