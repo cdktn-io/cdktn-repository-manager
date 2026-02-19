@@ -9,7 +9,7 @@ Importing a provider involves two phases:
 1. **Repository import** — copying the archived `cdktf/cdktf-provider-<name>` repository into `cdktn-io` via GitHub's import tool, then running Terraform to take ownership of it (branch protection, secrets, team permissions, etc.)
 2. **Provider migration** — updating the provider repository's toolchain from `@cdktf/provider-project` to `@cdktn/provider-project` and publishing under the `@cdktn` npm scope
 
-Both phases are automated via GitHub Actions workflows and gated behind a PR review + `/migrate` command.
+Both phases are automated via GitHub Actions workflows and gated behind a PR review + `/migrate` command. After `/migrate` succeeds the import PR auto-merges, which triggers `upgrade-repositories` to handle the provider migration automatically.
 
 ---
 
@@ -35,8 +35,6 @@ For each provider `<name>`, import **two** repositories:
 | `https://github.com/cdktf/cdktf-provider-<name>-go` | `cdktn-io/cdktn-provider-<name>-go` (Public) |
 
 Go to [github.com/new/import](https://github.com/new/import) for each.
-
-> **Note for large providers (e.g. AWS):** GitHub's import tool may time out for repositories larger than ~2 GiB. See [plans/large-providers.md](large-providers.md) for the EC2-based workaround.
 
 ---
 
@@ -85,45 +83,33 @@ The `/migrate` comment triggers `import-apply.yml`, which:
 1. Validates the PR is approved and the commenter has write access
 2. Runs `terraform apply` on the relevant stack shard — importing both repos into Terraform state and applying all configuration (branch protection, secrets, team permissions, labels, webhooks)
 3. Removes `<name>` from `pending-imports.json` and commits to the branch
-4. Dispatches `migrate-provider.yml` (passing the import PR number)
-5. Posts a success comment on the PR confirming apply completed
+4. Queues the import PR for auto-merge (squash)
+5. Posts a success comment on the PR
+
+The import PR then merges automatically once all required checks pass.
 
 ---
 
-## Step 5 — Migration PR (automatic)
+## Step 5 — Migration (automatic, triggered by import PR merge)
 
-`migrate-provider.yml` runs in the background and:
+When the import PR merges to `main`, `deploy.yml` runs:
 
-1. Checks out `cdktn-provider-<name>`
-2. Modifies `.projenrc.js`:
-   - `@cdktf/provider-project` → `@cdktn/provider-project`
-   - `CdktfProviderProject` → `CdktnProviderProject`
-   - `isDeprecated: true` → `isDeprecated: false`
-   - `minNodeVersion` bumped to `20.16.0`
-3. Upgrades to `@cdktn/provider-project@latest`
-4. Regenerates all files with `npx projen`
-5. Runs `yarn fetch` to pull the latest provider schema
-6. Runs `yarn build` to verify compilation
-7. Opens a PR on `cdktn-provider-<name>` from `auto/migrate-to-cdktn-scope` with `automerge` + `auto-approve` labels
-8. Enables auto-merge on that PR
-9. Posts a follow-up comment on the import PR with a direct link to the migration PR
+1. **Terraform deploy** — applies all stack shards (idempotent; the newly imported provider is already in state)
+2. **`upgrade-repositories.yml`** — runs for all providers including the newly imported one:
+   - Creates a fresh `.projenrc.js` from `projenrc.template.js` (already uses `@cdktn/provider-project`)
+   - Upgrades to `@cdktn/provider-project@latest`
+   - Regenerates all files with `npx projen` + `yarn fetch`
+   - Opens a migration PR on `cdktn-provider-<name>` with `automerge` + `auto-approve` labels
+   - The migration PR auto-merges, triggering a release to npm/PyPI/Go
 
----
-
-## Step 6 — Merge and release
-
-Once the migration PR auto-merges in `cdktn-provider-<name>`:
-
-1. **Merge the import PR** in `cdktn-repository-manager`
-2. **Check for an automatic release** — the provider repo's `release.yml` workflow should trigger and publish to npm/PyPI/Go. If it does not (e.g. no version bump was detected):
-   - Trigger `force-release` manually on `cdktn-provider-<name>` from the Actions tab
+No manual action required after commenting `/migrate`.
 
 ---
 
 ## Sequence Diagram
 
 ```
-Contributor          import-provider         import-apply          migrate-provider        cdktn-provider-<name>
+Contributor          import-provider         import-apply          deploy + upgrade-repos   cdktn-provider-<name>
     |                       |                     |                      |                        |
     | github.com/new/import |                     |                      |                        |
     | (x2 repos)            |                     |                      |                        |
@@ -145,21 +131,18 @@ Contributor          import-provider         import-apply          migrate-provi
     |                       |                     | validate guards      |                        |
     |                       |                     | terraform apply      |                        |
     |                       |                     | update pending-imports                        |
-    |                       |                     | dispatch ----------->|                        |
-    |                       |                     | (provider, pr_number)|                        |
+    |                       |                     | queue auto-merge     |                        |
     |                       |                     | post success comment |                        |
     |<--------------------------------------------------------------------|                        |
-    |                       |                     |                      | migrate .projenrc.js   |
-    |                       |                     |                      | npx projen + build     |
-    |                       |                     |                      | open migration PR ---->|
-    |                       |                     |                      | post follow-up comment |
-    |<--------------------------------------------------------------------|                        |
     |                       |                     |                      |                        |
-    |                                        migration PR auto-merges    |<-----(merged)----------|
+    |                       |          import PR auto-merges to main     |                        |
     |                       |                     |                      |                        |
-    | Reviewer merges       |                     |                      |                        |
-    | import PR #N          |                     |                      |                        |
-    | (optional) force-release on cdktn-provider-<name>                 |                        |
+    |                       |                     |            deploy.yml triggers                |
+    |                       |                     |            terraform apply (idempotent)        |
+    |                       |                     |            upgrade-repositories.yml ---------->|
+    |                       |                     |            (migration PR, automerge)           |
+    |                       |                     |                      |<-----(merged)-----------|
+    |                       |                     |                      | release triggered       |
 ```
 
 ---
@@ -185,12 +168,26 @@ git push origin import/<name>
 | `PR must be approved` | Get at least one approval before commenting `/migrate` |
 | `User does not have write access` | Only org members with write/admin access can trigger `/migrate` |
 
-### Migration PR build fails (node version)
+### Migration PR not created / upgrade-repositories didn't run
 
-If CI on the migration PR fails with `engine "node" is incompatible`, the `minNodeVersion` in `.projenrc.js` needs bumping to `20.16.0`. Check out `auto/migrate-to-cdktn-scope` in the provider repo, update the value, run `npx projen`, and push.
+If `upgrade-repositories` didn't open a migration PR after the import PR merged (e.g. the deploy run was skipped or failed), trigger it manually:
 
-This is now fixed in `migrate-provider.yml` for future imports.
+```sh
+gh workflow run upgrade-repositories.yml --repo cdktn-io/cdktn-repository-manager
+```
 
-### Migration PR already exists
+Alternatively, use `migrate-provider.yml` as a manual fallback for a specific provider:
 
-If `migrate-provider.yml` posts `no PR was created`, a branch `auto/migrate-to-cdktn-scope` likely already exists from a previous run. Either close the old PR/branch and re-trigger, or manually push fixes to the existing branch.
+```sh
+gh workflow run migrate-provider.yml \
+  --repo cdktn-io/cdktn-repository-manager \
+  -f provider=<name>
+```
+
+### Release not triggered after migration PR merges
+
+If the provider repo's `release.yml` doesn't fire (no version bump detected), trigger it manually:
+
+```sh
+gh workflow run force-release.yml --repo cdktn-io/cdktn-provider-<name>
+```

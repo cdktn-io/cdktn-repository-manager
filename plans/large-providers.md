@@ -1,5 +1,8 @@
 # Migrating Large Provider Repositories
 
+> [!NOTE]
+> DEPRECATED: Use the GitHub Import Tool instead of this manual process. This document is retained for historical reference on the challenges of migrating large repositories.
+
 This document captures the challenges and solutions discovered while migrating very large provider repositories (like `cdktf-provider-aws` at 6.88 GiB with 2.5 million git objects) from the archived `cdktf` org to `cdktn-io`.
 
 ## Problem Summary

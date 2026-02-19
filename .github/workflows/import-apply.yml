@@ -192,15 +192,16 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      - name: Dispatch migrate-provider workflow
+      - name: Auto-merge import PR
         if: success()
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh workflow run migrate-provider.yml \
-            -f provider=${{ steps.pr.outputs.provider }} \
-            -f import_pr_number=${{ github.event.issue.number }}
-          echo "✅ Dispatched migrate-provider workflow for ${{ steps.pr.outputs.provider }}"
+          gh pr merge ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --squash \
+            --auto
+          echo "✅ Import PR queued for auto-merge"
 
       - name: Post success comment
         if: success()
@@ -221,12 +222,13 @@ jobs:
                 '### What happened:',
                 '1. Terraform apply imported the repositories into state and configured them',
                 '2. `pending-imports.json` has been updated (import entry removed)',
-                `3. \`migrate-provider\` workflow has been dispatched for \`${provider}\``,
+                '3. Import PR has been queued for auto-merge',
                 '',
-                '### Next steps:',
-                `- The \`migrate-provider\` workflow has been dispatched — a follow-up comment will be posted here once the migration PR is opened in \`cdktn-provider-${provider}\``,
-                `- Once the migration PR merges, merge this PR`,
-                `- If needed, trigger \`force-release\` on \`cdktn-provider-${provider}\` for initial publish`,
+                '### What happens next (automatic):',
+                `- Once this PR merges, \`deploy.yml\` will run → \`upgrade-repositories.yml\` will migrate \`cdktn-provider-${provider}\` to \`@cdktn/provider-project\` and open a migration PR`,
+                '- The migration PR will auto-merge and trigger a release',
+                '',
+                'No further action needed.',
               ].join('\n')
             });
 
