@@ -24,7 +24,8 @@
         "random",
         "snowflake",
         "time",
-        "tls"
+        "tls",
+        "vault"
       ]
     },
     "repos-official-new": {
