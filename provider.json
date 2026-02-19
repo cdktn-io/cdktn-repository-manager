@@ -6,6 +6,7 @@
   "azurerm": "azurerm@~> 4.0",
   "cloudflare": "cloudflare/cloudflare@~> 5.0",
   "cloudinit": "hashicorp/cloudinit@~> 2.2",
+  "datadog": "DataDog/datadog@~> 3.0",
   "dns": "hashicorp/dns@~> 3.2",
   "docker": "kreuzwerker/docker@~> 3.0",
   "external": "hashicorp/external@~> 2.1",

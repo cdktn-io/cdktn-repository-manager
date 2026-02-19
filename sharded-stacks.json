@@ -13,6 +13,7 @@
         "azurerm",
         "cloudflare",
         "cloudinit",
+        "datadog",
         "docker",
         "external",
         "github",
