@@ -18,6 +18,7 @@
   "http": "hashicorp/http@~> 3.1",
   "kubernetes": "hashicorp/kubernetes@~> 2.0",
   "local": "hashicorp/local@~> 2.1",
+  "newrelic": "newrelic/newrelic@~> 3.7",
   "null": "hashicorp/null@~> 3.0",
   "postgresql": "cyrilgdn/postgresql@~> 1.14",
   "random": "hashicorp/random@~> 3.1",

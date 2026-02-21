@@ -22,6 +22,7 @@
         "helm",
         "kubernetes",
         "local",
+        "newrelic",
         "null",
         "postgresql",
         "random",
