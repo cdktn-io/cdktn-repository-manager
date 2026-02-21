@@ -13,6 +13,7 @@
         "azurerm",
         "cloudflare",
         "cloudinit",
+        "databricks",
         "datadog",
         "docker",
         "external",
