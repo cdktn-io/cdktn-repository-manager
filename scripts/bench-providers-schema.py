@@ -35,16 +35,38 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ---------------------------------------------------------------------------
 # Thresholds (validated against the 13-provider reference dataset, Feb 2026)
 # ---------------------------------------------------------------------------
-SCHEMA_MB_THRESHOLD = 2.25    # MB — gap: 2.18 (cloudflare, std) < X < 2.34 (datadog, custom)
-TOTAL_ATTRS_THRESHOLD = 6000  # — gap: 4970 (cloudflare, std) < X < 9283 (kubernetes, custom)
+SCHEMA_MB_THRESHOLD = (
+    2.25  # MB — gap: 2.18 (cloudflare, std) < X < 2.34 (datadog, custom)
+)
+TOTAL_ATTRS_THRESHOLD = (
+    6000  # — gap: 4970 (cloudflare, std) < X < 9283 (kubernetes, custom)
+)
 
 # Known custom-runner providers (for reference column in output)
-CUSTOM_RUNNER_PROVIDERS = {"aws", "azurerm", "datadog", "google", "googlebeta", "kubernetes"}
+CUSTOM_RUNNER_PROVIDERS = {
+    "aws",
+    "azurerm",
+    "datadog",
+    "google",
+    "googlebeta",
+    "kubernetes",
+}
 
 DEFAULT_PROVIDERS = [
-    "aws", "google", "azurerm", "kubernetes", "datadog", "googlebeta",
-    "cloudflare", "vault", "azuread", "github", "snowflake", "helm",
-    "docker", "grafana",
+    "aws",
+    "google",
+    "azurerm",
+    "kubernetes",
+    "datadog",
+    "googlebeta",
+    "cloudflare",
+    "vault",
+    "azuread",
+    "github",
+    "snowflake",
+    "helm",
+    "docker",
+    "grafana",
 ]
 
 
@@ -63,7 +85,7 @@ def extract_schema(provider: str, bench_dir: str) -> dict:
 
     # Run terraform providers schema -json (re-uses existing .terraform dir)
     result = subprocess.run(
-        ["terraform", "-chdir", provider_dir, "providers", "schema", "-json"],
+        ["terraform", f"-chdir={provider_dir}", "providers", "schema", "-json"],
         capture_output=True,
         text=True,
     )
@@ -82,8 +104,12 @@ def extract_schema(provider: str, bench_dir: str) -> dict:
     resources = pschema.get("resource_schemas", {})
     data_sources = pschema.get("data_source_schemas", {})
 
-    total_attrs = sum(count_attrs_recursive(r.get("block", {})) for r in resources.values())
-    total_attrs += sum(count_attrs_recursive(d.get("block", {})) for d in data_sources.values())
+    total_attrs = sum(
+        count_attrs_recursive(r.get("block", {})) for r in resources.values()
+    )
+    total_attrs += sum(
+        count_attrs_recursive(d.get("block", {})) for d in data_sources.values()
+    )
 
     schema_bytes = len(result.stdout.encode())
     schema_mb = schema_bytes / (1024 * 1024)
@@ -109,20 +135,30 @@ def classify(metrics: dict) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bench-dir", default="/tmp/tf-bench",
-                        help="Directory created by bench-providers-init.sh (default: /tmp/tf-bench)")
-    parser.add_argument("providers", nargs="*", default=DEFAULT_PROVIDERS,
-                        help="Provider aliases to analyse (default: all 14 in sample set)")
+    parser.add_argument(
+        "--bench-dir",
+        default="/tmp/tf-bench",
+        help="Directory created by bench-providers-init.sh (default: /tmp/tf-bench)",
+    )
+    parser.add_argument(
+        "providers",
+        nargs="*",
+        default=DEFAULT_PROVIDERS,
+        help="Provider aliases to analyse (default: all 14 in sample set)",
+    )
     args = parser.parse_args()
 
     # Filter to providers that have been initialised
     available = [
-        p for p in args.providers
+        p
+        for p in args.providers
         if os.path.isdir(os.path.join(args.bench_dir, p, ".terraform"))
     ]
     missing = [p for p in args.providers if p not in available]
     if missing:
-        print(f"WARNING: not initialised (run bench-providers-init.sh first): {', '.join(missing)}")
+        print(
+            f"WARNING: not initialised (run bench-providers-init.sh first): {', '.join(missing)}"
+        )
 
     if not available:
         print("No initialised providers found. Aborting.")
@@ -156,18 +192,25 @@ def main():
             print(f"{p:<14} ERROR: {m['error']}")
             continue
         verdict = classify(m)
+        expected_class = "CUSTOM" if p in CUSTOM_RUNNER_PROVIDERS else "standard"
         official = "CUSTOM ✓" if p in CUSTOM_RUNNER_PROVIDERS else "standard"
         flag = ""
-        if verdict != official.split()[0] and p in CUSTOM_RUNNER_PROVIDERS:
+        if verdict != expected_class:
             flag = " ← mismatch"
         print(
             f"{p:<14} {m['schema_mb']:>10.2f} {m['resources']:>10} {m['data_sources']:>9} "
             f"{m['total_attrs']:>12} {verdict:<10} {official}{flag}"
         )
 
-    print(f"\nThresholds: schema_json > {SCHEMA_MB_THRESHOLD} MB  OR  total_attrs > {TOTAL_ATTRS_THRESHOLD}")
-    print(f"Schema MB gap validated: 2.18 (cloudflare, std) < threshold < 2.34 (datadog, custom)")
-    print(f"TotalAttrs gap validated: 4970 (cloudflare, std) < threshold < 9283 (kubernetes, custom)")
+    print(
+        f"\nThresholds: schema_json > {SCHEMA_MB_THRESHOLD} MB  OR  total_attrs > {TOTAL_ATTRS_THRESHOLD}"
+    )
+    print(
+        f"Schema MB gap validated: 2.18 (cloudflare, std) < threshold < 2.34 (datadog, custom)"
+    )
+    print(
+        f"TotalAttrs gap validated: 4970 (cloudflare, std) < threshold < 9283 (kubernetes, custom)"
+    )
 
 
 if __name__ == "__main__":
