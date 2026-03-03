@@ -38,17 +38,13 @@
       "backend": {
         "workspaceName": "prebuilt-providers-official-new"
       },
-      "providers": [
-        "dns",
-        "hcp",
-        "http"
-      ]
+      "providers": ["dns", "hcp", "http"]
     },
     "repos-partners": {
       "backend": {
         "workspaceName": "prebuilt-providers-partners"
       },
-      "providers": []
+      "providers": ["grafana", "mongodbatlas"]
     }
   }
 }
