@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 #
 # scan-axios.sh — Audit cdktn-io org repos for the axios supply chain attack.
 #
