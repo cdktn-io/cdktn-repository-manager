@@ -145,12 +145,12 @@ export class PublishingSecretSet extends Construct {
     this.forPrefixedSecrets(repository, ghProvider, "twine-");
   }
 
-  // public forCsharp(
-  //   repository: Repository | DataGithubRepository,
-  //   ghProvider: GithubProvider,
-  // ) {
-  //   this.forPrefixedSecrets(repository, ghProvider, "nuget-");
-  // }
+  public forCsharp(
+    repository: Repository | DataGithubRepository,
+    ghProvider: GithubProvider,
+  ) {
+    this.forPrefixedSecrets(repository, ghProvider, "nuget-");
+  }
 
   // public forJava(
   //   repository: Repository | DataGithubRepository,
