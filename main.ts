@@ -136,13 +136,13 @@ class CdkTerrainProviderStack extends TerraformStack {
         topics: [...GithubRepository.defaultTopics, provider],
         team: githubTeam,
         protectMain: true,
-        // TODO: Re-enable Maven / Nuget
+        // TODO: Re-enable Maven
         protectMainChecks: [
           "build",
           "package-js",
           // "package-java",
           "package-python",
-          // "package-dotnet",
+          "package-dotnet",
           "package-go",
           "Validate PR title",
         ],
@@ -342,10 +342,10 @@ class CustomConstructsStack extends TerraformStack {
       if (languages.includes("python")) {
         secrets.forPython(repo.resource, githubProvider);
       }
-      // TODO: Re-enable NuGet and Maven
-      // if (languages.includes("csharp")) {
-      //   secrets.forCsharp(repo.resource, githubProvider);
-      // }
+      if (languages.includes("csharp")) {
+        secrets.forCsharp(repo.resource, githubProvider);
+      }
+      // TODO: Re-enable Maven
       // if (languages.includes("java")) {
       //   secrets.forJava(repo.resource, githubProvider);
       // }

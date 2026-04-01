@@ -74,8 +74,8 @@ export class PublishingSecretSet extends Construct {
       "npm-token",
       "twine-username",
       "twine-password",
-      // TODO: Re-enable NuGet & Maven
-      // "nuget-api-key",
+      "nuget-api-key",
+      // TODO: Re-enable Maven
       // "maven-username", // Set up Maven Central and store credentials in BitWarden
       // "maven-password", // Use the user token password (same as above)
       // "maven-gpg-private-key",
