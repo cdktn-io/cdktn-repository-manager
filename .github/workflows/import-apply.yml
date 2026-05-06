@@ -146,6 +146,7 @@ jobs:
           VAR_TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
           VAR_GH_COMMENT_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
           VAR_ALERT_PRS_SLACK_WEBHOOK_URL: ${{ secrets.ALERT_PRS_SLACK_WEBHOOK_URL }}
+          VAR_NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           STACK_DIR="cdktf.out/stacks/${{ steps.stack.outputs.stack }}"
           VARS="{}"

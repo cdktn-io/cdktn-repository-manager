@@ -74,8 +74,8 @@ export class PublishingSecretSet extends Construct {
       "npm-token",
       "twine-username",
       "twine-password",
-      // TODO: Re-enable NuGet & Maven
-      // "nuget-api-key",
+      "nuget-api-key",
+      // TODO: Re-enable Maven
       // "maven-username", // Set up Maven Central and store credentials in BitWarden
       // "maven-password", // Use the user token password (same as above)
       // "maven-gpg-private-key",
@@ -145,12 +145,12 @@ export class PublishingSecretSet extends Construct {
     this.forPrefixedSecrets(repository, ghProvider, "twine-");
   }
 
-  // public forCsharp(
-  //   repository: Repository | DataGithubRepository,
-  //   ghProvider: GithubProvider,
-  // ) {
-  //   this.forPrefixedSecrets(repository, ghProvider, "nuget-");
-  // }
+  public forCsharp(
+    repository: Repository | DataGithubRepository,
+    ghProvider: GithubProvider,
+  ) {
+    this.forPrefixedSecrets(repository, ghProvider, "nuget-");
+  }
 
   // public forJava(
   //   repository: Repository | DataGithubRepository,
