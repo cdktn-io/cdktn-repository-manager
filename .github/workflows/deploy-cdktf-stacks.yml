@@ -70,6 +70,10 @@ jobs:
           VAR_GH_COMMENT_TOKEN: ${{ secrets.GH_COMMENT_TOKEN }}
           VAR_ALERT_PRS_SLACK_WEBHOOK_URL: ${{ secrets.ALERT_PRS_SLACK_WEBHOOK_URL }}
           VAR_NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          VAR_MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          VAR_MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          VAR_MAVEN_GPG_PRIVATE_KEY_PASSPHRASE: ${{ secrets.MAVEN_GPG_PRIVATE_KEY_PASSPHRASE }}
+          VAR_MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
         run: |
           STACK_DIR="cdktf.out/stacks/${{ matrix.stack }}"
           VARS="{}"

@@ -75,12 +75,10 @@ export class PublishingSecretSet extends Construct {
       "twine-username",
       "twine-password",
       "nuget-api-key",
-      // TODO: Re-enable Maven
-      // "maven-username", // Set up Maven Central and store credentials in BitWarden
-      // "maven-password", // Use the user token password (same as above)
-      // "maven-gpg-private-key",
-      // "maven-gpg-private-key-passphrase",
-      // "maven-staging-profile-id",
+      "maven-username", // Set up Maven Central and store credentials in BitWarden
+      "maven-password", // Use the user token password (same as above)
+      "maven-gpg-private-key",
+      "maven-gpg-private-key-passphrase",
     ].map((name) => new SecretFromVariable(this, name));
 
     const npmSecret = this.secrets.find((s) => s.name === "npm-token");
@@ -152,12 +150,12 @@ export class PublishingSecretSet extends Construct {
     this.forPrefixedSecrets(repository, ghProvider, "nuget-");
   }
 
-  // public forJava(
-  //   repository: Repository | DataGithubRepository,
-  //   ghProvider: GithubProvider,
-  // ) {
-  //   this.forPrefixedSecrets(repository, ghProvider, "maven-");
-  // }
+  public forJava(
+    repository: Repository | DataGithubRepository,
+    ghProvider: GithubProvider,
+  ) {
+    this.forPrefixedSecrets(repository, ghProvider, "maven-");
+  }
 
   public forGo(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
