@@ -1,6 +1,6 @@
 name: "Plan"
 
-on: [pull_request]
+on: [pull_request_target]
 concurrency: ${{ github.workflow }}-${{ github.head_ref }}
 
 permissions:
