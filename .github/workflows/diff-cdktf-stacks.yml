@@ -44,8 +44,11 @@ jobs:
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          # Scoped to the org because `terraform plan` reads vulnerability_alerts on
+          # every managed provider repo. Narrowing to `cdktn-repository-manager` only
+          # breaks plan with 403s. A finer-grained App with limited perms is the
+          # right longer-term fix; out of scope for this PR.
           owner: cdktn-io
-          repositories: cdktn-repository-manager
 
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
