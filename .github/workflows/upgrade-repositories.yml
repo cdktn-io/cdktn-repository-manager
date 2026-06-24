@@ -1,7 +1,13 @@
 name: "Upgrade Provider Repositories"
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      providers:
+        description: "Space/comma-separated provider keys to upgrade (empty = all). Useful for canarying a rollout."
+        type: string
+        required: false
+        default: ""
   workflow_call: {}
 
 jobs:
@@ -13,8 +19,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - id: set-matrix
+        env:
+          PROVIDERS_INPUT: ${{ inputs.providers }}
         run: |
-          provider=$(jq -rcM "{ provider: keys }" provider.json)
+          if [ -n "$PROVIDERS_INPUT" ]; then
+            # Filter to the requested keys (intersected with provider.json so
+            # typos drop out and produce a visibly empty matrix).
+            provider=$(jq -rcM --arg list "$PROVIDERS_INPUT" \
+              '($list | gsub("[,]"; " ") | split(" ") | map(select(length > 0))) as $sel
+               | { provider: [ keys[] | select(. as $k | $sel | index($k)) ] }' \
+              provider.json)
+          else
+            provider=$(jq -rcM "{ provider: keys }" provider.json)
+          fi
           echo "matrix=$provider" >> $GITHUB_OUTPUT
 
   upgrade-provider:
