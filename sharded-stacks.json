@@ -40,6 +40,7 @@
         "workspaceName": "prebuilt-providers-official-new"
       },
       "providers": [
+        "awscc",
         "dns",
         "hcp",
         "http"
