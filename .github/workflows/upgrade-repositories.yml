@@ -75,14 +75,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          # @cdktn/provider-project declares engines node>=22.11.0 as of v0.8.0, and
-          # yarn classic *errors* on an engines mismatch (unlike npm, which warns):
-          #   error @cdktn/provider-project@0.8.1: The engine "node" is incompatible
-          #   with this module. Expected version ">= 22.11.0". Got "20.20.2"
-          # 22 is what provider-project itself is built and tested against. This only
-          # affects the tooling that runs projen here, not the minNodeVersion of the
-          # generated provider repos.
-          node-version: "22"
+          # yarn classic *errors* on an engines mismatch (unlike npm, which warns),
+          # so this must satisfy BOTH:
+          #   - @cdktn/provider-project, engines node>=22.11.0 as of v0.8.0
+          #   - the provider repo itself, engines node>=24.11.0 from the template's
+          #     minNodeVersion -- `yarn install --check-files` runs inside it
+          # Keep this >= projenrc.template.js's minNodeVersion.
+          node-version: "24"
 
       - name: Setup Copywrite tool
         uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3

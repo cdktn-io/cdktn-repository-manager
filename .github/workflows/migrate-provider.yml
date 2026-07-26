@@ -49,9 +49,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          # Also runs `yarn add --dev @cdktn/provider-project@latest`, which needs
-          # node>=22.11.0 -- see the note in upgrade-repositories.yml.
-          node-version: "22"
+          # Also installs @cdktn/provider-project and synths a provider repo, so it
+          # must satisfy both engines floors -- see the note in upgrade-repositories.yml.
+          node-version: "24"
 
       - name: Setup Copywrite tool
         uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3
