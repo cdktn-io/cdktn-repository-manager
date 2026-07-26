@@ -49,7 +49,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          # Also installs @cdktn/provider-project and synths a provider repo, so it
+          # must satisfy both engines floors -- see the note in upgrade-repositories.yml.
+          node-version: "24"
 
       - name: Setup Copywrite tool
         uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3
@@ -154,7 +156,7 @@ jobs:
                   '',
                   '### Next steps:',
                   `- Once the migration PR merges, merge this PR`,
-                  `- If needed, trigger \`force-release\` on \`cdktn-provider-${provider}\` for initial publish`,
+                  `- If needed, manually dispatch \`release\` (with a \`sha\` and the \`publish_to_*\` toggles) on \`cdktn-provider-${provider}\` for initial publish`,
                 ].join('\n')
               : `## ⚠️ Migration workflow ran for \`${provider}\` but no PR was created (it may already exist on \`auto/migrate-to-cdktn-scope\`).`;
 

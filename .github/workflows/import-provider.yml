@@ -231,7 +231,7 @@ jobs:
              - After apply succeeds, it will automatically dispatch the `migrate-provider` workflow
              - The migration creates a PR in the provider repo to switch to `@cdktn` scope
           4. **Merge** this PR after `/migrate` succeeds
-          5. **Trigger `force-release`** on the provider repo if the migration PR didn't auto-release
+          5. **Manually dispatch `release`** (with a `sha` and the `publish_to_*` toggles) on the provider repo if the migration PR didn't auto-release
           EOF
           )" \
             --head "import/${PROVIDER}" \

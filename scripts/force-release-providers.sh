@@ -6,7 +6,7 @@
 if [[ $# -eq 0 ]] ; then
     echo 'Usage: scripts/force-release-providers.sh <filter>'
     echo
-    echo 'This script runs the workflow "force-release" on every provider listed in provider.json'
+    echo 'This script runs the manual dispatch of the "release" workflow on every provider listed in provider.json'
     echo 'Please note that the tool is quite naive and will generate a release for every provider you agree with'
     echo 'It DOES NOT see if the previous release is there or not, so please exercise caution while using it'
     echo
@@ -18,9 +18,11 @@ if [[ $# -eq 0 ]] ; then
 fi
 
 providers=$(jq -rcM "keys | .[]" provider.json)
-org="cdktf"
 filter=$1
-workflow_name=force-release
+# force-release.yml was folded into release.yml in @cdktn/provider-project v0.7.42
+# so npm/PyPI OIDC have a single trusted-publisher entrypoint. The manual inputs
+# (sha, publish_to_*) are unchanged, only the workflow file differs.
+workflow_name=release
 
 for provider in $providers; do
   read -p "Creating workflow for provider $provider. Continue? [y/n] " -n 1 -r
