@@ -156,7 +156,7 @@ jobs:
                   '',
                   '### Next steps:',
                   `- Once the migration PR merges, merge this PR`,
-                  `- If needed, trigger \`force-release\` on \`cdktn-provider-${provider}\` for initial publish`,
+                  `- If needed, manually dispatch \`release\` (with a \`sha\` and the \`publish_to_*\` toggles) on \`cdktn-provider-${provider}\` for initial publish`,
                 ].join('\n')
               : `## ⚠️ Migration workflow ran for \`${provider}\` but no PR was created (it may already exist on \`auto/migrate-to-cdktn-scope\`).`;
 
