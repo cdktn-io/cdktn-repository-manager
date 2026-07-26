@@ -13,7 +13,7 @@ const project = new CdktnProviderProject({
   minNodeVersion: "20.16.0",
   typescriptVersion: "~5.9.0", // JSII and TS should always use the same major/minor version range
   jsiiVersion: "~5.9.0", // JSII and TS should always use the same major/minor version range
-  devDeps: ["@cdktn/provider-project@^0.7.0"],
+  devDeps: ["@cdktn/provider-project@^0.8.0"],
   isDeprecated: false,
   npmTrustedPublishing: true,
   pypiTrustedPublishing: __PYPI_TRUSTED__,

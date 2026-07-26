@@ -107,6 +107,15 @@ jobs:
         env:
           NODE_OPTIONS: "--max-old-space-size=7168"
 
+      - name: Remove workflows projen no longer generates
+        # @cdktn/provider-project v0.7.42 folded force-release.yml into
+        # release.yml so npm/PyPI OIDC have a single trusted-publisher
+        # entrypoint. projen stops *generating* the file but never deletes the
+        # copy already committed, so without this it lingers in every provider
+        # repo as a second, now-unmaintained publish entrypoint.
+        run: rm -f .github/workflows/force-release.yml
+        working-directory: ./provider
+
       - name: Add headers using Copywrite tool
         run: copywrite headers
         working-directory: ./provider
