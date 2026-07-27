@@ -89,6 +89,9 @@ jobs:
       - name: Upgrade to latest @cdktn/provider-project
         run: |
           pnpm add -D @cdktn/provider-project@latest
+          # projen >=0.101.7 is required for the pnpm APIs the template uses --
+          # see the note in upgrade-repositories.yml.
+          pnpm add -D projen@^0.101.20
 
       - name: Regenerate with projen
         run: |

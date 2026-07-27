@@ -115,6 +115,16 @@ jobs:
           git config user.email "${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           git checkout -b foo-bar-${{ github.run_number }}
           pnpm add -D @cdktn/provider-project@latest
+          # .projenrc.js runs under the PROVIDER REPO's own projen, not the template's.
+          # @cdktn/provider-project >=0.9.0 uses pnpm APIs that only exist in projen
+          # >=0.101.7 (pnpmOptions.workspaceYamlOptions,
+          # PnpmWorkspaceYamlSchemaNodeLinker), while the repos are still pinned to the
+          # projen that last synthed them (^0.99.74) -- so synth dies with
+          # "Cannot read properties of undefined (reading 'HOISTED')".
+          # pnpm won't resolve this via the peer range either, because the repo's own
+          # explicit devDependency wins. Bootstrap it; later synths pin the running
+          # version themselves.
+          pnpm add -D projen@^0.101.20
           npx projen
           # `unset CI` above matters under pnpm: CI=true implies --frozen-lockfile, and
           # the `npx projen` on the line above rewrites package.json, so a frozen
