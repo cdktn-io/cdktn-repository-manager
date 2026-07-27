@@ -46,6 +46,14 @@ jobs:
           terraform_version: 1.13.3
           terraform_wrapper: false
 
+      # Runs on depot-ubuntu-24.04-8, which tracks the GitHub runner image: yarn 1.x
+      # is preinstalled but pnpm is not. Must precede setup-node.
+      # Keep in sync with @cdktn/provider-project's pnpm version.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: "10.33.0"
+
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -57,7 +65,10 @@ jobs:
         uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3
 
       - name: Install dependencies
-        run: yarn install
+        # The repo being migrated is still yarn-based at this point, but projen will
+        # switch it to pnpm below and delete yarn.lock, so install with pnpm from the
+        # start rather than leaving a half-yarn/half-pnpm tree behind.
+        run: pnpm install --no-frozen-lockfile
 
       - name: Migrate to @cdktn scope
         run: |
@@ -77,14 +88,21 @@ jobs:
 
       - name: Upgrade to latest @cdktn/provider-project
         run: |
-          yarn add --dev @cdktn/provider-project@latest
+          pnpm add -D @cdktn/provider-project@latest
+          # projen >=0.101.7 is required for the pnpm APIs the template uses --
+          # see the note in upgrade-repositories.yml.
+          pnpm add -D projen@^0.101.20
 
       - name: Regenerate with projen
         run: |
           unset CI
           npx projen
-          yarn install --check-files
-          yarn fetch
+          # `unset CI` is load-bearing under pnpm: CI=true implies --frozen-lockfile
+          # and the projen run above rewrites package.json.
+          pnpm install --no-frozen-lockfile
+          # `pnpm run fetch`, NOT `pnpm fetch` -- the latter is a pnpm builtin that
+          # fetches from the lockfile and generates nothing while exiting 0.
+          pnpm run fetch
           # Fix readme (requires src/version.json to be populated)
           npx projen
 
@@ -93,9 +111,11 @@ jobs:
 
       - name: Build and verify
         run: |
-          yarn build
+          # unset CI so projen's build doesn't spawn install:ci (--frozen-lockfile)
+          unset CI
+          pnpm run build
 
-        # yarn build bumps package.json, must reset after build!
+        # the build bumps package.json, must reset after build!
       - name: Reset the version in package.json
         run: npm pkg set version="0.0.0"
 
