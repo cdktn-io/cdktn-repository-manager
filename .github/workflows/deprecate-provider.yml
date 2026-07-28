@@ -35,17 +35,29 @@ jobs:
         with:
           repository: ${{ env.PROVIDER_REPO_FULL }}
           token: ${{ steps.app-token.outputs.token }}
+      # This job operates on a PROVIDER repo, so it needs pnpm and Node >= the
+      # template's minNodeVersion. Keep in sync with @cdktn/provider-project.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: "10.33.0"
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          # Provider repos declare engines node>=24.11.0; installing on Node 20 fails
+          # the engines check outright.
+          node-version: "24"
       - name: Install
-        run: yarn install
+        run: pnpm install --no-frozen-lockfile
       - name: Kick off the deprecation
         run: |
           sed -i "s/isDeprecated: false,/isDeprecated: true,/" .projenrc.js
       - name: Do a build
-        run: yarn && yarn build
+        run: |
+          # unset CI so projen's build doesn't spawn install:ci (--frozen-lockfile)
+          # after the sed above changes what projen will synthesize
+          unset CI
+          pnpm install --no-frozen-lockfile && pnpm run build
       - name: Reset the version in package.json
         run: npm pkg set version="0.0.0"
       - name: Create Pull Request

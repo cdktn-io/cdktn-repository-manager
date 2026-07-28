@@ -186,7 +186,11 @@ Example:
   - Builds matrix from `provider.json`
   - Checks out both this repo and each provider repo
   - Creates `.projenrc.js` from template
-  - Runs `yarn add --dev @cdktn/provider-project@latest` and `npx projen`
+  - Runs `pnpm add -D @cdktn/provider-project@latest` and `npx projen`
+  - Provider repos use **pnpm**; this repo's own build is still Yarn Classic. Only
+    the steps that run inside a checked-out provider repo use pnpm.
+  - Note `pnpm run fetch`, never `pnpm fetch` — the latter is a pnpm builtin that
+    fetches from the lockfile, exits 0, and regenerates nothing.
   - Detects breaking changes
   - Creates PRs with appropriate labels
 

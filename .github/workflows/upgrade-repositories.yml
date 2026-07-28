@@ -72,10 +72,28 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           path: provider
 
+      # The jsii-terraform container ships yarn 1.x baked in at /usr/bin/yarn but has
+      # no pnpm, so it must be installed. Must run BEFORE setup-node: setup-node's
+      # `cache: pnpm` (if ever enabled) needs pnpm already on PATH.
+      # The version is pinned rather than read from the provider repo's
+      # `packageManager` field, because on the yarn->pnpm transition run that field
+      # does not exist yet. Keep it in sync with @cdktn/provider-project's pnpm
+      # version (projen's DEFAULT_PNPM_VERSION).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: "10.33.0"
+
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          # Package managers *error* on an engines mismatch, so this must satisfy BOTH:
+          #   - @cdktn/provider-project, engines node>=22.11.0
+          #   - the provider repo itself, engines node>=22.11.0 from the template's
+          #     minNodeVersion -- the install below runs inside it
+          # This is tooling, so it tracks projenrc.template.js's workflowNodeVersion
+          # (current LTS), NOT minNodeVersion (the consumer floor). Keep it >= the floor.
+          node-version: "24"
 
       - name: Setup Copywrite tool
         uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3
@@ -97,15 +115,40 @@ jobs:
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           git checkout -b foo-bar-${{ github.run_number }}
-          yarn add --dev @cdktn/provider-project@latest
+          pnpm add -D @cdktn/provider-project@latest
+          # .projenrc.js runs under the PROVIDER REPO's own projen, not the template's.
+          # @cdktn/provider-project >=0.9.0 uses pnpm APIs that only exist in projen
+          # >=0.101.7 (pnpmOptions.workspaceYamlOptions,
+          # PnpmWorkspaceYamlSchemaNodeLinker), while the repos are still pinned to the
+          # projen that last synthed them (^0.99.74) -- so synth dies with
+          # "Cannot read properties of undefined (reading 'HOISTED')".
+          # pnpm won't resolve this via the peer range either, because the repo's own
+          # explicit devDependency wins. Bootstrap it; later synths pin the running
+          # version themselves.
+          pnpm add -D projen@^0.101.20
           npx projen
-          yarn install --check-files
-          yarn fetch
+          # `unset CI` above matters under pnpm: CI=true implies --frozen-lockfile, and
+          # the `npx projen` on the line above rewrites package.json, so a frozen
+          # install would fail with ERR_PNPM_OUTDATED_LOCKFILE. Explicit here too.
+          pnpm install --no-frozen-lockfile
+          # MUST be `pnpm run fetch`, never `pnpm fetch`: the latter is a pnpm builtin
+          # that fetches from the lockfile, exits 0, and generates no bindings -- the
+          # workflow would then find no diff and report success having done nothing.
+          pnpm run fetch
           # fix the readme as it requires src/version.json to be populated
           npx projen
         working-directory: ./provider
         env:
           NODE_OPTIONS: "--max-old-space-size=7168"
+
+      - name: Remove workflows projen no longer generates
+        # @cdktn/provider-project v0.7.42 folded force-release.yml into
+        # release.yml so npm/PyPI OIDC have a single trusted-publisher
+        # entrypoint. projen stops *generating* the file but never deletes the
+        # copy already committed, so without this it lingers in every provider
+        # repo as a second, now-unmaintained publish entrypoint.
+        run: rm -f .github/workflows/force-release.yml
+        working-directory: ./provider
 
       - name: Add headers using Copywrite tool
         run: copywrite headers
@@ -114,7 +157,12 @@ jobs:
       - name: Check for changes
         id: git_diff
         run: |
-          git diff --exit-code || echo "has_changes=true" >> $GITHUB_OUTPUT
+          # Use git status, not `git diff`: diff only sees tracked modifications and
+          # deletions, so a run whose only effect is ADDING files goes undetected.
+          # The pnpm migration adds pnpm-lock.yaml and pnpm-workspace.yaml, and
+          # `git add .` in the commit step below would stage them regardless -- so
+          # detection has to agree with what actually gets committed.
+          [ -z "$(git status --porcelain)" ] || echo "has_changes=true" >> $GITHUB_OUTPUT
         working-directory: ./provider
 
       - if: steps.git_diff.outputs.has_changes
