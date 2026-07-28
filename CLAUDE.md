@@ -40,7 +40,7 @@ The infrastructure is divided into **sharded stacks** defined in `sharded-stacks
 - **`main.ts`**: Entry point that creates CDKTF stacks and validates configuration
 - **`provider.json`**: Maps provider names to Terraform registry versions (e.g., `"aws": "hashicorp/aws@~> 6.0"`)
 - **`sharded-stacks.json`**: Defines which providers belong to which stack
-- **`providersWithCustomRunners.json`**: Lists providers requiring custom GitHub runners
+- **`providersWithCustomRunners.json`**: Maps providers requiring custom GitHub runners to their settings, e.g. `{"datadog": {"nodeHeapSizeMb": 24576}, "aws": {}}`. An empty object means "custom runner, default settings". A legacy plain-array form is still accepted.
 - **`projenrc.template.js`**: Template for `.projenrc.js` files generated in provider repositories
 - **`lib/repository.ts`**: Defines `GithubRepository` and `GithubRepositoryFromExistingRepository` constructs
 - **`lib/secrets.ts`**: Manages GitHub Actions secrets for package publishing
@@ -148,7 +148,7 @@ yarn upgrade:next
    "providers": ["archive", "aws", "newprovider"]
    ```
 
-3. If the provider needs custom runners, add to `providersWithCustomRunners.json`
+3. If the provider needs custom runners, add it to `providersWithCustomRunners.json` with an empty object: `"newprovider": {}`. Only add `nodeHeapSizeMb` if the provider has demonstrably OOMed on the default ceiling.
 
 4. Validate and deploy:
    ```bash
@@ -202,7 +202,8 @@ Located in `.github/lib/`:
 
 - **`create-projen-files.js`**: Generates `.projenrc.js` for provider repos using the template
   - Replaces `__PROVIDER__` with version from `provider.json`
-  - Replaces `__CUSTOM_RUNNER__` with boolean from `providersWithCustomRunners.json`
+  - Replaces `__CUSTOM_RUNNER__` with a boolean derived from `providersWithCustomRunners.json` (provider present = true)
+  - Replaces `__NODE_HEAP_MB__` with that provider's `nodeHeapSizeMb`, or `undefined` to take the runner-class default
 
 - **`collect-changes.js`**: Detects breaking vs non-breaking changes in provider updates
 - **`create-pr.js`**: Creates pull requests for provider upgrades

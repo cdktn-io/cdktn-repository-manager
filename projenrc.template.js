@@ -7,6 +7,10 @@ const { CdktnProviderProject } = require("@cdktn/provider-project");
 
 const project = new CdktnProviderProject({
   useCustomGithubRunner: __CUSTOM_RUNNER__,
+  // Per-provider V8 heap ceiling from providersWithCustomRunners.json.
+  // `undefined` means "take the default for the runner class" -- which is what
+  // every provider should use unless it has demonstrably OOMed on the default.
+  nodeHeapSizeMb: __NODE_HEAP_MB__,
   terraformProvider: "__PROVIDER__",
   cdktnVersion: "^0.23.0",
   constructsVersion: "^10.6.0",
