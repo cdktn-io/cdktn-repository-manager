@@ -115,7 +115,7 @@ jobs:
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           git checkout -b foo-bar-${{ github.run_number }}
-          pnpm add -D @cdktn/provider-project@latest
+          pnpm add -D @cdktn/provider-project@latest --config.minimumReleaseAge=0
           # .projenrc.js runs under the PROVIDER REPO's own projen, not the template's.
           # @cdktn/provider-project >=0.9.0 uses pnpm APIs that only exist in projen
           # >=0.101.7 (pnpmOptions.workspaceYamlOptions,
