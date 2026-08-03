@@ -1,7 +1,7 @@
 {
   "aws": {},
   "azurerm": {},
-  "datadog": {},
+  "datadog": { "nodeHeapSizeMb": 16384 },
   "google": {},
   "googlebeta": {},
   "kubernetes": {}
