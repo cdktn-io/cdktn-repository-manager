@@ -39,7 +39,9 @@ jobs:
     name: "Upgrade"
     runs-on: ubuntu-latest
     container:
-      image: terraconstructs/jsii-terraform@sha256:4942a4c6ed8286f403c7855dab56b0e11f9a7115e7e0afbcd49d7e69de4d6dc0
+      # 0.24.0 image (cdk-terrain b91823e3d). Ships Terraform 1.15.8 alongside
+      # the 1.6.5 default; the fetch below selects it via TERRAFORM_BINARY_NAME.
+      image: terraconstructs/jsii-terraform@sha256:8a260318e59d1debad735c328581261f2c469584191ec50783dad135837b4127
     strategy:
       fail-fast: false
       matrix: ${{fromJSON(needs.build-provider-matrix.outputs.matrix)}}
@@ -148,6 +150,16 @@ jobs:
         working-directory: ./provider
         env:
           NODE_OPTIONS: "--max-old-space-size=7168"
+          # Terraform only emits the newer protocol data in `providers schema`
+          # output from these versions on: functions >=1.8, ephemeral resources
+          # >=1.10, write-only attributes >=1.11. The image's default
+          # `terraform` symlink is still 1.6.5 (kept so cdk-terrain's CI
+          # matrices, which key off that default, stay untouched), so the fetch
+          # must select the newer binary explicitly. @cdktn/provider-schema
+          # resolves it from this env var; same mechanism cdk-terrain's
+          # examples.yml uses. Without this, `pnpm run fetch` silently
+          # generates bindings with none of the new 0.24 feature surfaces.
+          TERRAFORM_BINARY_NAME: "terraform1.15.8"
 
       - name: Remove workflows projen no longer generates
         # @cdktn/provider-project v0.7.42 folded force-release.yml into
