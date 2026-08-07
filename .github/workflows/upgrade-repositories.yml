@@ -128,7 +128,13 @@ jobs:
           # explicit devDependency wins. Bootstrap it; later synths pin the running
           # version themselves.
           pnpm add -D projen@^0.101.20
-          npx projen
+          # MUST be `node .projenrc.js`, not `npx projen`: the bare projen CLI
+          # resolves its "default" task from .projen/tasks.json, which exists in
+          # every established repo but NOT in a freshly created provider repo --
+          # there the CLI dies with "Unable to find projen project" before the
+          # first synth can create it. Running the projenrc directly is exactly
+          # what the default task does anyway, and works in both cases.
+          node .projenrc.js
           # `unset CI` above matters under pnpm: CI=true implies --frozen-lockfile, and
           # the `npx projen` on the line above rewrites package.json, so a frozen
           # install would fail with ERR_PNPM_OUTDATED_LOCKFILE. Explicit here too.
