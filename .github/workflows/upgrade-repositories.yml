@@ -128,13 +128,21 @@ jobs:
           # explicit devDependency wins. Bootstrap it; later synths pin the running
           # version themselves.
           pnpm add -D projen@^0.101.20
-          # MUST be `node .projenrc.js`, not `npx projen`: the bare projen CLI
-          # resolves its "default" task from .projen/tasks.json, which exists in
-          # every established repo but NOT in a freshly created provider repo --
-          # there the CLI dies with "Unable to find projen project" before the
-          # first synth can create it. Running the projenrc directly is exactly
-          # what the default task does anyway, and works in both cases.
-          node .projenrc.js
+          # First-synth bootstrap. projen 0.100.0 (PR projen#4766) removed the
+          # five-year-old tryLegacySynth() fallback that ran `node .projenrc.js`
+          # when no .projen/tasks.json exists, so the bare CLI now dies in a
+          # virgin repo with "Unable to find projen project" -- the manifest it
+          # wants is itself an output of the first synth. Seed a stub default
+          # task (byte-identical in shape to what projen generates; the real
+          # synth overwrites it) so `npx projen` works uniformly in virgin AND
+          # established repos, keeping the task runtime's manifest env (PATH)
+          # and PROJEN_DISABLE_POST handling that a direct `node .projenrc.js`
+          # would bypass.
+          if [ ! -f .projen/tasks.json ]; then
+            mkdir -p .projen
+            printf '%s\n' '{"tasks":{"default":{"name":"default","description":"Synthesize project files","steps":[{"execArgs":["node",".projenrc.js"]}]}}}' > .projen/tasks.json
+          fi
+          npx projen
           # `unset CI` above matters under pnpm: CI=true implies --frozen-lockfile, and
           # the `npx projen` on the line above rewrites package.json, so a frozen
           # install would fail with ERR_PNPM_OUTDATED_LOCKFILE. Explicit here too.
