@@ -235,7 +235,7 @@ jobs:
           #     minNodeVersion -- the install below runs inside it
           # This is tooling, so it tracks projenrc.template.js's workflowNodeVersion
           # (current LTS), NOT minNodeVersion (the consumer floor). Keep it >= the floor.
-          node-version: "24"
+          node-version: "22"
 
       - name: Setup Copywrite tool
         uses: hashicorp/setup-copywrite@32638da2d4e81d56a0764aa1547882fc4d209636 # v1.1.3
