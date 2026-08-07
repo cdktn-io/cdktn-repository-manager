@@ -12,8 +12,8 @@ const project = new CdktnProviderProject({
   // every provider should use unless it has demonstrably OOMed on the default.
   nodeHeapSizeMb: __NODE_HEAP_MB__,
   terraformProvider: "__PROVIDER__",
-  cdktnVersion: "^0.23.0",
-  constructsVersion: "^10.6.0",
+  cdktnVersion: "^0.24.0",
+  constructsVersion: "^>=10.6.0 <10.8.0",
   // engines.node -- the compat floor we publish to CONSUMERS, not a CI knob.
   // projen's own docs: "Most projects should not use this option ... Setting this
   // option has very high impact on the consumers of your package, as package
