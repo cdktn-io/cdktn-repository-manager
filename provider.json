@@ -4,6 +4,7 @@
   "aws": "hashicorp/aws@~> 6.0",
   "azuread": "hashicorp/azuread@~> 3.0",
   "azurerm": "azurerm@~> 5.0",
+  "cfncompat": "cdktn-io/cfncompat@~> 0.1",
   "cloudflare": "cloudflare/cloudflare@~> 5.0",
   "cloudinit": "hashicorp/cloudinit@~> 2.2",
   "databricks": "databricks/databricks@~> 1.0",
