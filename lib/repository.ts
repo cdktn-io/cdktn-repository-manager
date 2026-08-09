@@ -24,8 +24,25 @@ export interface RepositoryConfig {
   team: ITeam;
   protectMain?: boolean;
   protectMainChecks?: string[];
+  /**
+   * Minimal branch protection: blocks deletion and force-pushes on main, but
+   * requires no status checks and no reviews, so an automated job can push
+   * straight to main. Only consulted when `protectMain` is false.
+   */
+  protectMainMinimal?: boolean;
   webhookUrl: string;
   provider: GithubProvider;
+  /**
+   * Marks this repository as a GitHub template repository.
+   */
+  isTemplate?: boolean;
+  /**
+   * Provisions this repository by generating it from cdktn-provider-template
+   * instead of from an empty initial commit, so it is born with the
+   * base-branch workflows its first pull request needs.
+   * See docs/template-repo.md.
+   */
+  fromProviderTemplate?: boolean;
 }
 
 export class RepositorySetup extends Construct {
@@ -34,7 +51,12 @@ export class RepositorySetup extends Construct {
     name: string,
     config: Pick<
       RepositoryConfig,
-      "team" | "webhookUrl" | "provider" | "protectMain" | "protectMainChecks"
+      | "team"
+      | "webhookUrl"
+      | "provider"
+      | "protectMain"
+      | "protectMainChecks"
+      | "protectMainMinimal"
     > & {
       repository: Repository | DataGithubRepository;
     },
@@ -45,6 +67,7 @@ export class RepositorySetup extends Construct {
       protectMain = false,
       // TODO: Re-add license/cla ?
       protectMainChecks = ["build"], // , "license/cla"],
+      protectMainMinimal = false,
       provider,
       repository,
       team,
@@ -96,6 +119,15 @@ export class RepositorySetup extends Construct {
         ],
         provider,
       });
+    } else if (protectMainMinimal) {
+      new BranchProtection(this, "main-protection", {
+        pattern: "main",
+        repositoryId: repository.name,
+        enforceAdmins: true,
+        allowsDeletions: false,
+        allowsForcePushes: false,
+        provider,
+      });
     }
 
     new TeamRepository(this, "managing-team", {
@@ -143,6 +175,8 @@ export class GithubRepository extends Construct {
       topics = GithubRepository.defaultTopics,
       description = "Repository management for prebuilt CDK Terrain providers",
       provider,
+      isTemplate = false,
+      fromProviderTemplate = false,
     } = config;
     this.provider = provider;
 
@@ -155,6 +189,7 @@ export class GithubRepository extends Construct {
       hasIssues: !name.endsWith("-go"),
       hasWiki: false,
       autoInit: true,
+      isTemplate,
       hasProjects: false,
       deleteBranchOnMerge: true,
       allowAutoMerge: true,
@@ -164,6 +199,22 @@ export class GithubRepository extends Construct {
       vulnerabilityAlerts: !name.endsWith("-go"),
       topics,
       provider,
+      ...(fromProviderTemplate
+        ? {
+            template: {
+              owner: "cdktn-io",
+              repository: "cdktn-provider-template",
+            },
+          }
+        : {}),
+      // Unconditional, on every repo this construct creates. `template` and
+      // `auto_init` are creation-time-only inputs that GitHub never reports
+      // back, so ignoring them keeps `template{}` a plan no-op on repositories
+      // that already exist or are being imported. Upstream
+      // integrations/terraform-provider-github#2090 flags maintainer intent to
+      // make setting `template` on an existing repository stricter -- re-check
+      // this on provider upgrades past 6.6.0. See docs/template-repo.md.
+      lifecycle: { ignoreChanges: ["template", "auto_init"] },
     });
 
     new RepositorySetup(this, "repository-setup", {
