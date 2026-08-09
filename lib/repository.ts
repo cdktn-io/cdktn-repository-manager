@@ -37,6 +37,10 @@ export interface RepositoryConfig {
    */
   isTemplate?: boolean;
   /**
+   * Defaults to true for main repos and false for -go repos.
+   */
+  hasIssues?: boolean;
+  /**
    * Provisions this repository by generating it from cdktn-provider-template
    * instead of from an empty initial commit, so it is born with the
    * base-branch workflows its first pull request needs.
@@ -186,7 +190,7 @@ export class GithubRepository extends Construct {
       archiveOnDestroy: true,
       visibility: "public",
       homepageUrl: "https://cdktn.io",
-      hasIssues: !name.endsWith("-go"),
+      hasIssues: config.hasIssues ?? !name.endsWith("-go"),
       hasWiki: false,
       autoInit: true,
       isTemplate,

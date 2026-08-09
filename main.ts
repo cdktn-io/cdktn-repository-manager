@@ -231,6 +231,9 @@ class CdkTerrainProviderStack extends TerraformStack {
       webhookUrl: slackWebhook.stringValue,
       provider: githubProvider,
       isTemplate: true,
+      // Issues are pointless on a repo whose content is generated; problems
+      // belong in cdktn-repository-manager or cdktn-provider-project.
+      hasIssues: false,
       // The sync job pushes straight to main, so main carries no required
       // checks and no required reviews -- only deletion/force-push guards.
       protectMainMinimal: true,
