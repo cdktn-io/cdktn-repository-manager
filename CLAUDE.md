@@ -106,16 +106,16 @@ yarn lint
 yarn test
 ```
 
-### CDKTF Operations
+### CDKTN Operations
 
 ```bash
 # Deploy a specific stack
-cdktf deploy repos
-cdktf deploy repos-official-new
-cdktf deploy repos-partners
+cdktn deploy repos
+cdktn deploy repos-official-new
+cdktn deploy repos-partners
 
 # Deploy with auto-approve
-cdktf deploy --auto-approve repos
+cdktn deploy --auto-approve repos
 
 # Show Terraform output
 yarn output
@@ -127,7 +127,7 @@ yarn repos
 ### Upgrading Dependencies
 
 ```bash
-# Upgrade CDKTF to latest
+# Upgrade CDKTN to latest
 yarn upgrade
 
 # Upgrade to next/beta version
@@ -154,7 +154,7 @@ yarn upgrade:next
    ```bash
    yarn build
    yarn synth
-   cdktf deploy <stack-name>
+   cdktn deploy <stack-name>
    ```
 
 5. The workflow will create two repos:
@@ -179,7 +179,7 @@ Example:
 
 - **`deploy-cdktf-stacks.yml`**: Deploys infrastructure changes to GitHub
   - Triggered by other workflows
-  - Runs `cdktf deploy` for specified stacks
+  - Runs `cdktn deploy` for specified stacks
   - Can trigger repository upgrades after deployment
 
 - **`upgrade-repositories.yml`**: Upgrades all provider repositories
@@ -226,11 +226,11 @@ Per-repository secrets (managed by code):
 - `TWINE_USERNAME`, `TWINE_PASSWORD`
 - `ALERT_PRS_SLACK_WEBHOOK_URL`
 
-### CDKTF Configuration
+### CDKTN Configuration
 
-- **CDKTF version**: 0.21.0 (pinned in package.json and template)
+- **CDKTN version**: 0.21.0 (pinned in package.json and template)
 - **Terraform version**: 1.13.3 (specified in package.json)
-- **Node version**: 20.9.0+ (see engines in package.json)
+- **Node version**: 24+ (see engines in package.json)
 - **TypeScript/JSII version**: ~5.8.0 (must match major/minor)
 
 ### Repository Settings
@@ -249,7 +249,6 @@ All provider repositories are configured with:
 When working with this codebase, remember:
 
 1. **CDKTF → CDKTN naming**: Comments and TODOs reference the old "cdktf" name
-2. **Legacy packages in use**: Still using `cdktf@0.21.0` and `cdktf-cli@0.21.0` for generation
-3. **Projen migration complete**: Provider repos use `@cdktn/provider-project`, not `@cdktf/provider-project`
-4. **Java/C# on hold**: NuGet and Maven publishing is commented out throughout the code
-5. **Remote backend TODO**: S3 or Terraform Cloud backend not yet configured
+2. **Projen migration complete**: Provider repos use `@cdktn/provider-project`, not `@cdktf/provider-project`
+3. **Java/C# on hold**: NuGet and Maven publishing is commented out throughout the code
+4. **Remote backend TODO**: S3 or Terraform Cloud backend not yet configured

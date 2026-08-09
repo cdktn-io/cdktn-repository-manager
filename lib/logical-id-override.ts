@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MPL-2.0
  */
 
-import { TerraformElement } from "cdktf";
+import { TerraformElement } from "cdktn";
 import { Node } from "constructs";
 import { makeUniqueId } from "./unique-id-override";
 

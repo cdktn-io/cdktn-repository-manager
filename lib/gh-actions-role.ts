@@ -4,7 +4,7 @@
  */
 
 import { Construct } from "constructs";
-import { TerraformOutput } from "cdktf";
+import { TerraformOutput } from "cdktn";
 import { AwsStack, AwsStackProps } from "terraconstructs/lib/aws";
 import { OpenIdConnectProvider, Role, FederatedPrincipal } from "terraconstructs/lib/aws/iam";
 import { Duration } from "terraconstructs";
