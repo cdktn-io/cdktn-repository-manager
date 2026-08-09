@@ -3,6 +3,7 @@
   "archive": "hashicorp/archive@~> 2.2",
   "aws": "hashicorp/aws@~> 6.0",
   "awscc": "hashicorp/awscc@~> 1.0",
+  "azapi": "Azure/azapi@~> 2.11",
   "azuread": "hashicorp/azuread@~> 3.0",
   "azurerm": "azurerm@~> 5.0",
   "cfncompat": "cdktn-io/cfncompat@~> 0.1",
