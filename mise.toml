@@ -5,3 +5,4 @@ jq = "latest"
 node = "20" # move to v22+ after node-gyp isue resolved in CDKTF
 opentofu = "latest"
 terraform = "1.13.3"
+yarn = "1.22.22"
