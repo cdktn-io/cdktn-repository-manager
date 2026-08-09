@@ -2,6 +2,6 @@
 "aqua:getsops/sops" = "3.11.0"
 gh = "latest"
 jq = "latest"
-node = "20" # move to v22+ after node-gyp isue resolved in CDKTF
+node = "24"
 opentofu = "latest"
 terraform = "1.13.3"

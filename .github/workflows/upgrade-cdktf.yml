@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Install
         run: yarn install
       - name: Get current CDKTF version
@@ -120,7 +120,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Install
         run: yarn install
       - name: Do the upgrade
@@ -143,7 +143,7 @@ jobs:
             Unfortunately, not everything can be automated, and the following steps need to be completed manually:
 
             - [ ] Wait for #${{ needs.upgrade_repos.outputs.pr_id }} to be merged and for the deployment to succeed
-            - [ ] Upgrade `@cdktf/provider-github` to a version compatible with `cdktn@${{ needs.check_versions.outputs.latest_version }}` (`yarn add ...`)
+            - [ ] Upgrade `@cdktn/provider-github` to a version compatible with `cdktn@${{ needs.check_versions.outputs.latest_version }}` (`yarn add ...`)
 
             Please checkout this PR, complete the above steps, push the changes to this branch, and then mark this PR as ready for review to complete the upgrade. Thanks!
           labels: automerge,automated,dependencies

@@ -5,14 +5,14 @@
 
 import { Construct } from "constructs";
 import { SecretFromVariable } from "./secrets";
-import { GithubProvider } from "@cdktf/provider-github/lib/provider";
-import { Repository } from "@cdktf/provider-github/lib/repository";
-import { DataGithubRepository } from "@cdktf/provider-github/lib/data-github-repository";
-import { IssueLabel } from "@cdktf/provider-github/lib/issue-label";
-import { BranchProtection } from "@cdktf/provider-github/lib/branch-protection";
-import { TeamRepository } from "@cdktf/provider-github/lib/team-repository";
-import { RepositoryWebhook } from "@cdktf/provider-github/lib/repository-webhook";
-import { RepositoryDependabotSecurityUpdates } from "@cdktf/provider-github/lib/repository-dependabot-security-updates";
+import { GithubProvider } from "@cdktn/provider-github/lib/provider";
+import { Repository } from "@cdktn/provider-github/lib/repository";
+import { DataGithubRepository } from "@cdktn/provider-github/lib/data-github-repository";
+import { IssueLabel } from "@cdktn/provider-github/lib/issue-label";
+import { BranchProtection } from "@cdktn/provider-github/lib/branch-protection";
+import { TeamRepository } from "@cdktn/provider-github/lib/team-repository";
+import { RepositoryWebhook } from "@cdktn/provider-github/lib/repository-webhook";
+import { RepositoryDependabotSecurityUpdates } from "@cdktn/provider-github/lib/repository-dependabot-security-updates";
 
 export interface ITeam {
   id: string;
