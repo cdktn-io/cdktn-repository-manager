@@ -40,72 +40,86 @@ jobs:
             });
 
             const branch = pr.data.head.ref;
+            const headSha = pr.data.head.sha;
             core.setOutput('branch', branch);
-            core.setOutput('sha', pr.data.head.sha);
+            core.setOutput('sha', headSha);
 
-            // Guard: branch must match import/*
-            if (!branch.startsWith('import/')) {
-              core.setFailed(`Branch '${branch}' does not match 'import/*' pattern. /migrate only works on import PRs.`);
+            // Guard: branch must match import/<provider> with a strict provider charset.
+            // Refnames per git check-ref-format permit ; $ & | etc. — those would shell-inject
+            // when interpolated into run: blocks below.
+            const branchMatch = branch.match(/^import\/([a-z0-9-]+)$/);
+            if (!branchMatch) {
+              core.setFailed(`Branch '${branch}' does not match 'import/<provider>' (provider must be [a-z0-9-]+). /migrate only works on import PRs.`);
               return;
             }
-
-            // Extract provider name from branch
-            const provider = branch.replace('import/', '');
+            const provider = branchMatch[1];
             core.setOutput('provider', provider);
 
-            // Guard: PR must be approved
+            // Guard: PR must have an APPROVED review on the CURRENT head SHA.
+            // Without SHA-pinning, an approved PR could be force-pushed with malicious
+            // code and any write-access user could /migrate it.
             const reviews = await github.rest.pulls.listReviews({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            const approved = reviews.data.some(r => r.state === 'APPROVED');
-            if (!approved) {
-              core.setFailed('PR must be approved before running /migrate.');
+            const approvedAtHead = reviews.data.some(r => r.state === 'APPROVED' && r.commit_id === headSha);
+            if (!approvedAtHead) {
+              core.setFailed(`PR must have an APPROVED review on the current head SHA (${headSha}) before running /migrate. Re-request review after pushing new commits.`);
               return;
             }
 
-            // Guard: commenter must have write access
+            // Guard: commenter must have admin access. /migrate runs terraform apply
+            // against prod with publishing secrets — write is not enough.
             const permission = await github.rest.repos.getCollaboratorPermissionLevel({
               owner: context.repo.owner,
               repo: context.repo.repo,
               username: context.payload.comment.user.login
             });
             const level = permission.data.permission;
-            if (!['admin', 'write'].includes(level)) {
-              core.setFailed(`User ${context.payload.comment.user.login} does not have write access (has: ${level}).`);
+            if (level !== 'admin') {
+              core.setFailed(`User ${context.payload.comment.user.login} does not have admin access (has: ${level}). /migrate requires admin.`);
               return;
             }
 
             core.info(`Provider: ${provider}`);
             core.info(`Branch: ${branch}`);
+            core.info(`Head SHA: ${headSha}`);
             core.info(`Commenter: ${context.payload.comment.user.login} (${level})`);
-            core.info(`PR approved: yes`);
+            core.info(`PR approved at head: yes`);
 
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.2.1
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          # Scoped to the org because `terraform apply` reads vulnerability_alerts and
+          # writes to each managed provider repo. See diff-cdktf-stacks.yml for details.
           owner: cdktn-io
 
       - name: Checkout PR branch
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ steps.pr.outputs.branch }}
+          ref: ${{ steps.pr.outputs.sha }}
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Determine stack
         id: stack
+        env:
+          PROVIDER: ${{ steps.pr.outputs.provider }}
         run: |
-          PROVIDER="${{ steps.pr.outputs.provider }}"
           STACK=$(jq -r --arg p "$PROVIDER" '
             .stacks | to_entries[] | select(.value.providers | index($p)) | .key
           ' sharded-stacks.json)
 
           if [ -z "$STACK" ]; then
             echo "::error::Provider '$PROVIDER' not found in any shard in sharded-stacks.json."
+            exit 1
+          fi
+
+          if ! [[ "$STACK" =~ ^[a-z0-9-]+$ ]]; then
+            echo "::error::Refusing to run on unsafe stack name: $STACK"
             exit 1
           fi
 

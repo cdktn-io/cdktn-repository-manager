@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.2.1
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
@@ -41,8 +41,13 @@ jobs:
 
       - name: Validate provider and determine stack
         id: validate
+        env:
+          PROVIDER: ${{ inputs.provider }}
         run: |
-          PROVIDER="${{ inputs.provider }}"
+          if ! [[ "$PROVIDER" =~ ^[a-z0-9-]+$ ]]; then
+            echo "::error::Invalid provider name (must match [a-z0-9-]+): $PROVIDER"
+            exit 1
+          fi
 
           # Must exist in original-providers.json
           if ! jq -e --arg p "$PROVIDER" '.[$p]' original-providers.json > /dev/null 2>&1; then

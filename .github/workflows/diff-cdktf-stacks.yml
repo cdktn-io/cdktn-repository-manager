@@ -28,14 +28,26 @@ jobs:
       fail-fast: false
       matrix: ${{fromJSON(inputs.stacks)}}
       max-parallel: 10
+    env:
+      STACK: ${{ matrix.stack }}
 
     steps:
+      - name: Validate stack name
+        run: |-
+          if ! [[ "$STACK" =~ ^[a-z0-9-]+$ ]]; then
+            echo "::error::Refusing to run on unsafe stack name: $STACK"
+            exit 1
+          fi
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.2.1
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          # Scoped to the org because `terraform plan` reads vulnerability_alerts on
+          # every managed provider repo. Narrowing to `cdktn-repository-manager` only
+          # breaks plan with 403s. A finer-grained App with limited perms is the
+          # right longer-term fix; out of scope for this PR.
           owner: cdktn-io
 
       - name: Checkout
@@ -62,7 +74,7 @@ jobs:
           node-version: "20"
 
       - name: Install
-        run: yarn install
+        run: yarn install --ignore-scripts
       - name: Synth
         run: "$(yarn bin)/cdktf synth"
       - name: Write Terraform variables
@@ -82,7 +94,7 @@ jobs:
           VAR_MAVEN_GPG_PRIVATE_KEY_PASSPHRASE: ${{ secrets.MAVEN_GPG_PRIVATE_KEY_PASSPHRASE }}
           VAR_MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
         run: |
-          STACK_DIR="cdktf.out/stacks/${{ matrix.stack }}"
+          STACK_DIR="cdktf.out/stacks/$STACK"
           VARS="{}"
           for var in $(jq -r '.variable | keys[]' "$STACK_DIR/cdk.tf.json"); do
             ENV_NAME="VAR_$(echo "$var" | tr 'a-z-' 'A-Z_')"
@@ -95,10 +107,10 @@ jobs:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -o pipefail
-          cd cdktf.out/stacks/${{ matrix.stack }}
+          cd "cdktf.out/stacks/$STACK"
           rm -rf .terraform
           terraform init
-          terraform plan -no-color | tee ../../../plan_stdout_${{ matrix.stack }}.txt; echo $?
+          terraform plan -no-color | tee "../../../plan_stdout_${STACK}.txt"; echo $?
           set +o pipefail
         continue-on-error: true
       - name: Save results into a variable
@@ -107,6 +119,8 @@ jobs:
       - name: Comment the plan output on the PR
         if: contains(github.event_name, 'pull_request') # pull_request or pull_request_target
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          STACK_NAME: ${{ matrix.stack }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -120,7 +134,7 @@ jobs:
               actionName: "${{github.event_name}}",
               workingDirectory: "${{env.tf_actions_working_dir}}",
               workflowName: "${{github.workflow}}",
-              stackName: "${{matrix.stack}}"
+              stackName: process.env.STACK_NAME
             })
       - name: Fail this check if the plan was not successful
         if: steps.plan_outcome.outputs.value != 'success'

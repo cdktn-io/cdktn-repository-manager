@@ -10,15 +10,25 @@ concurrency: ${{ github.workflow }}-${{ github.head_ref }}
 jobs:
   add-copyright-headers:
     runs-on: ubuntu-latest
+    if: contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
     env:
       PULL_REQUEST_REF: ${{ github.event.pull_request.head.ref }}
+      PULL_REQUEST_SHA: ${{ github.event.pull_request.head.sha }}
     permissions:
       contents: write
     steps:
+      - name: Validate ref name
+        run: |-
+          # Defense against refname-injection into the `git push` shell line below.
+          # git check-ref-format permits ; $ & | ( ) etc.; restrict to a safe character set.
+          if ! [[ "$PULL_REQUEST_REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::Refusing to run on unsafe ref name: $PULL_REQUEST_REF"
+            exit 1
+          fi
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
       - name: Set git identity
         run: |-
@@ -38,4 +48,4 @@ jobs:
         run: |-
           git add .
           git commit -s -m "chore: add required copyright headers"
-          git push origin HEAD:$PULL_REQUEST_REF
+          git push origin "HEAD:$PULL_REQUEST_REF"

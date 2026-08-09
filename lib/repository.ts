@@ -110,7 +110,7 @@ export class RepositorySetup extends Construct {
           {
             requiredApprovingReviewCount: 1,
             requireCodeOwnerReviews: false, // NOTE: In the future, Security wants to enforce this, so be warned...
-            dismissStaleReviews: false,
+            dismissStaleReviews: true,
           },
         ],
         requireConversationResolution: true,

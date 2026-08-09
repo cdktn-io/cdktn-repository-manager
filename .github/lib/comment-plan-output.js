@@ -14,6 +14,9 @@ module.exports = ({
   stackName,
 }) => {
   const { readFileSync } = require("fs");
+  if (!/^[a-z0-9-]+$/.test(stackName)) {
+    throw new Error(`Refusing to read plan for unsafe stack name: ${stackName}`);
+  }
   const data = readFileSync(`./plan_stdout_${stackName}.txt`, "utf-8");
   const isLargeOutput = data.length > 65000;
   const refreshLinesRegex = /: Refreshing state\.\.\.\s*\[id=/i;
