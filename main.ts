@@ -27,6 +27,7 @@ import { TerraformVariable } from "cdktf";
 import { GithubProvider } from "@cdktf/provider-github/lib/provider";
 import { DataGithubTeam } from "@cdktf/provider-github/lib/data-github-team";
 import { ActionsSecret } from "@cdktf/provider-github/lib/actions-secret";
+import { ActionsRepositoryPermissions } from "@cdktf/provider-github/lib/actions-repository-permissions";
 
 type StackShards = {
   primaryStack: string;
@@ -128,6 +129,7 @@ class CdkTerrainProviderStack extends TerraformStack {
         githubProvider,
         githubTeam,
       );
+      this.createProviderTemplateRepo(slackWebhook, githubProvider, githubTeam);
     }
 
     const providerRepos: GitUrls[] = Object.keys(providers).map((provider) => {
@@ -147,6 +149,7 @@ class CdkTerrainProviderStack extends TerraformStack {
         ],
         webhookUrl: slackWebhook.stringValue,
         provider: githubProvider,
+        fromProviderTemplate: true,
       });
 
       // repo to publish go packages to
@@ -205,6 +208,48 @@ class CdkTerrainProviderStack extends TerraformStack {
 
     new TerraformOutput(this, "templateRepoUrl", {
       value: templateRepository?.resource.htmlUrl,
+    });
+  }
+
+  /**
+   * cdktn-provider-template: the GitHub template repository every
+   * cdktn-provider-<name> repo is generated from. Its content (three
+   * base-branch workflows plus a README) is kept current by
+   * upgrade-repositories.yml's sync-template job, not by Terraform.
+   * See docs/template-repo.md.
+   */
+  private createProviderTemplateRepo(
+    slackWebhook: TerraformVariable,
+    githubProvider: GithubProvider,
+    githubTeam: DataGithubTeam,
+  ) {
+    const templateRepo = new GithubRepository(this, "cdktn-provider-template", {
+      description:
+        "Template repository new cdktn-io provider repositories are generated from.",
+      topics: ["cdktn", "cdk-terrain", "template"],
+      team: githubTeam,
+      webhookUrl: slackWebhook.stringValue,
+      provider: githubProvider,
+      isTemplate: true,
+      // The sync job pushes straight to main, so main carries no required
+      // checks and no required reviews -- only deletion/force-push guards.
+      protectMainMinimal: true,
+    });
+
+    // The workflows stored here are `pull_request_target` workflows meant to
+    // run in the repositories generated FROM this one. This repository is
+    // public, holds no credentials and has nothing to build, so they must
+    // never execute here. Disabling Actions is a repository setting and does
+    // not affect generate-from-template or the sync job's push, both of which
+    // only read and write contents.
+    new ActionsRepositoryPermissions(this, "template-actions-disabled", {
+      repository: templateRepo.resource.name,
+      enabled: false,
+      provider: githubProvider,
+    });
+
+    new TerraformOutput(this, "providerTemplateRepoUrl", {
+      value: templateRepo.resource.htmlUrl,
     });
   }
 
