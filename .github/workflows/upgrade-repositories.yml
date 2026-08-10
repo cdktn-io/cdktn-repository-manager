@@ -38,7 +38,8 @@ jobs:
     name: "Sync template repository"
     runs-on: ubuntu-latest
     container:
-      image: terraconstructs/jsii-terraform@sha256:8a260318e59d1debad735c328581261f2c469584191ec50783dad135837b4127
+      # Same digest on Docker Hub and GHCR (one build, pushed to both) — the registry swap does not change the image.
+      image: ghcr.io/open-constructs/jsii-terraform@sha256:8a260318e59d1debad735c328581261f2c469584191ec50783dad135837b4127
     steps:
       - name: Checkout this repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -181,7 +182,8 @@ jobs:
     container:
       # 0.24.0 image (cdk-terrain b91823e3d). Ships Terraform 1.15.8 alongside
       # the 1.6.5 default; the fetch below selects it via TERRAFORM_BINARY_NAME.
-      image: terraconstructs/jsii-terraform@sha256:8a260318e59d1debad735c328581261f2c469584191ec50783dad135837b4127
+      # Same digest on Docker Hub and GHCR (one build, pushed to both) — the registry swap does not change the image.
+      image: ghcr.io/open-constructs/jsii-terraform@sha256:8a260318e59d1debad735c328581261f2c469584191ec50783dad135837b4127
     strategy:
       fail-fast: false
       matrix: ${{fromJSON(needs.build-provider-matrix.outputs.matrix)}}
