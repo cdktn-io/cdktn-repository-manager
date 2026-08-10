@@ -46,7 +46,7 @@ jobs:
         with:
           # Provider repos declare engines node>=24.11.0; installing on Node 20 fails
           # the engines check outright.
-          node-version: "24"
+          node-version: "22"
       - name: Install
         run: pnpm install --no-frozen-lockfile
       - name: Kick off the deprecation
@@ -107,7 +107,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install
         run: yarn install
       - name: Remove the provider from our configuration
