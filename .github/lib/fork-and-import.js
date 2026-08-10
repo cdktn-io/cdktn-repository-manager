@@ -86,7 +86,7 @@ if (!fs.existsSync(stackDir)) {
 const cdkTfJsonPath = path.join(stackDir, "cdk.tf.json");
 if (!fs.existsSync(cdkTfJsonPath)) {
   console.error(`❌ Error: cdk.tf.json not found in ${stackDir}`);
-  console.error('   Make sure you run "yarn synth" first.');
+  console.error('   Make sure you run "pnpm run synth" first.');
   process.exit(1);
 }
 
