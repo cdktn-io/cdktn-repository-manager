@@ -75,35 +75,35 @@ The infrastructure is divided into **sharded stacks** defined in `sharded-stacks
 
 ```bash
 # Install dependencies
-yarn install
+pnpm install
 
 # Generate CDKTF providers (GitHub provider)
-yarn get
+pnpm run get
 
 # Compile TypeScript
-yarn build
+pnpm run build
 
 # Run full build (get + compile)
-yarn build
+pnpm run build
 
 # Synthesize Terraform configuration
-yarn synth
+pnpm run synth
 
 # Watch mode (recompile on changes)
-yarn watch
+pnpm run watch
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-yarn format
+pnpm run format
 
 # Run linter
-yarn lint
+pnpm run lint
 
 # Run tests (currently a placeholder)
-yarn test
+pnpm run test
 ```
 
 ### CDKTN Operations
@@ -118,21 +118,26 @@ cdktn deploy repos-partners
 cdktn deploy --auto-approve repos
 
 # Show Terraform output
-yarn output
+pnpm run output
 
 # Get list of provider repo URLs
-yarn repos
+pnpm run repos
 ```
 
 ### Upgrading Dependencies
 
 ```bash
 # Upgrade CDKTN to latest
-yarn upgrade
+pnpm run upgrade
 
 # Upgrade to next/beta version
-yarn upgrade:next
+pnpm run upgrade:next
 ```
+
+Note the `run` is required here: `pnpm upgrade` (without `run`) is pnpm's own
+builtin command (an alias for `pnpm update`) and shadows the `upgrade` script
+defined in `package.json`, so it silently does something different from what
+you want. Always use `pnpm run upgrade` / `pnpm run upgrade:next`.
 
 ## Development Workflow
 
@@ -152,8 +157,8 @@ yarn upgrade:next
 
 4. Validate and deploy:
    ```bash
-   yarn build
-   yarn synth
+   pnpm run build
+   pnpm run synth
    cdktn deploy <stack-name>
    ```
 
@@ -187,8 +192,7 @@ Example:
   - Checks out both this repo and each provider repo
   - Creates `.projenrc.js` from template
   - Runs `pnpm add -D @cdktn/provider-project@latest` and `npx projen`
-  - Provider repos use **pnpm**; this repo's own build is still Yarn Classic. Only
-    the steps that run inside a checked-out provider repo use pnpm.
+  - Provider repos use **pnpm**; this repo's own build has also migrated to pnpm.
   - Note `pnpm run fetch`, never `pnpm fetch` — the latter is a pnpm builtin that
     fetches from the lockfile, exits 0, and regenerates nothing.
   - Detects breaking changes

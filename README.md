@@ -42,13 +42,13 @@ gh auth status
 
 ```bash
 # Install dependencies
-yarn install
+pnpm install
 
 # Build the project
-yarn build
+pnpm run build
 
 # Generate Terraform configuration
-yarn synth
+pnpm run synth
 
 # Run Terraform commands
 cd cdktf.out/stacks/repos

@@ -18,7 +18,7 @@
 #
 # Then run the migration:
 #   cd ~/cdktn-repository-manager
-#   yarn install && yarn build && yarn synth
+#   pnpm install && pnpm run build && pnpm run synth
 #   USE_SSH=1 GITHUB_TOKEN=$(gh auth token) node .github/lib/fork-and-import.js cdktf.out/stacks/repos --only=cdktn-provider-aws --yes
 
 set -euo pipefail
@@ -81,9 +81,9 @@ echo ""
 echo "Verifying installations..."
 ~/.local/bin/mise ls
 
-# Install yarn
+# Enable corepack (provides pnpm per the packageManager field in package.json)
 echo ""
-echo "Enabling corepack" # auto install yarn, pnpm, ...
+echo "Enabling corepack" # auto install pnpm, yarn, ...
 # ensure node 20 is globally available
 ~/.local/bin/mise mise use -g node@20
 corepack enable
@@ -134,7 +134,7 @@ echo "   gh ssh-key add ~/.ssh/migration_key.pub --title \"EC2 Migration\""
 echo ""
 echo "3. Build the project:"
 echo "   cd ~/cdktn-repository-manager"
-echo "   yarn install && yarn build && yarn synth"
+echo "   pnpm install && pnpm run build && pnpm run synth"
 echo ""
 echo "4. Use Screen or Tmux:"
 echo "   start:"

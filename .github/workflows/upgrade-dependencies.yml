@@ -6,7 +6,7 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   upgrade:
-    name: Upgrade dependencies using yarn
+    name: Upgrade dependencies using pnpm
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,31 +24,34 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
       - name: Install
-        run: yarn install
-      - name: Run yarn outdated
-        run: yarn outdated > outdated.txt
+        run: pnpm install --frozen-lockfile
+      - name: Run pnpm outdated
+        run: pnpm outdated > outdated.txt
         continue-on-error: true
-        # Took me way too much debugging to figure out: `yarn outdated` uses exit code 1 if outdated packages are present
-        # See also: https://github.com/yarnpkg/yarn/issues/7573
-      - name: Save the output from yarn outdated in a variable to reference in the PR body
-        id: yarn
+        # pnpm also exits 1 when outdated packages exist, undocumented — same
+        # workaround we needed for yarn (yarnpkg/yarn#7573).
+      - name: Save the output from pnpm outdated in a variable to reference in the PR body
+        id: pnpm
         # See: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#multiline-strings
         # See also https://github.com/github/docs/issues/21529 for more info on why this is not quite so simple
         run: |
-          YARN_OUTDATED=$(cat outdated.txt)
+          PNPM_OUTDATED=$(cat outdated.txt)
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "outdated<<$EOF" >> "$GITHUB_OUTPUT"
-          echo "$YARN_OUTDATED" >> "$GITHUB_OUTPUT"
+          echo "$PNPM_OUTDATED" >> "$GITHUB_OUTPUT"
           echo "$EOF" >> "$GITHUB_OUTPUT"
       - name: Remove temporary file
         run: rm outdated.txt
       - name: Do the upgrade
-        run: yarn upgrade
+        run: pnpm update
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
         with:
@@ -58,13 +61,13 @@ jobs:
           title: "chore(deps): upgrade dependencies for this repo only"
           body: |
             This PR upgrades dependencies used by this repo (`cdktn-repository-manager`) to their latest version based on the version range specified in the `package.json` file.
-            For reference, here is the output from `yarn outdated` prior to running `yarn upgrade` which was used to produce this PR:
+            For reference, here is the output from `pnpm outdated` prior to running `pnpm update` which was used to produce this PR:
 
             ```
-            ${{ steps.yarn.outputs.outdated }}
+            ${{ steps.pnpm.outputs.outdated }}
             ```
 
-            Note that this auto-update process only stays within specified version ranges (typically minor or patch). If you want to upgrade to newer versions beyond those, you will need to manually check out this repository and run the command `yarn upgrade [package] --latest`.
+            Note that this auto-update process only stays within specified version ranges (typically minor or patch). If you want to upgrade to newer versions beyond those, you will need to manually check out this repository and run the command `pnpm update [package] --latest`.
 
             For future reference: the reason why we're not using Dependabot for this is because this repo has a tendency to run into rate limits, and Dependabot produces so many PRs and workflow runs that it'd be likely to hit those limits quickly.
           labels: automerge,auto-approve,dependencies
