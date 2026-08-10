@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # pnpm 10 blocks dependency install scripts by default. tsx -> esbuild needs its
 # postinstall to place the platform binary; cdktf.json runs `npx tsx main.ts`,
 # so without this, synth fails.
