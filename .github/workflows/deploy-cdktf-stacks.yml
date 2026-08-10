@@ -63,13 +63,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Install
         run: yarn install
 
       - name: Synth
-        run: "$(yarn bin)/cdktf synth"
+        run: "$(yarn bin)/cdktn synth"
 
       - name: Write Terraform variables
         env:
@@ -97,7 +97,7 @@ jobs:
           echo "$VARS" > "$STACK_DIR/terraform.tfvars.json"
 
       - name: Deploy
-        run: "$(yarn bin)/cdktf deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
+        run: "$(yarn bin)/cdktn deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           CDKTF_LOG_LEVEL: all

@@ -4,12 +4,12 @@
  */
 
 import { Construct } from "constructs";
-import { TerraformVariable } from "cdktf";
+import { TerraformVariable } from "cdktn";
 import { constantCase } from "change-case";
-import { Repository } from "@cdktf/provider-github/lib/repository";
-import { DataGithubRepository } from "@cdktf/provider-github/lib/data-github-repository";
-import { GithubProvider } from "@cdktf/provider-github/lib/provider";
-import { ActionsSecret } from "@cdktf/provider-github/lib/actions-secret";
+import { Repository } from "@cdktn/provider-github/lib/repository";
+import { DataGithubRepository } from "@cdktn/provider-github/lib/data-github-repository";
+import { GithubProvider } from "@cdktn/provider-github/lib/provider";
+import { ActionsSecret } from "@cdktn/provider-github/lib/actions-secret";
 
 export class SecretFromVariable extends Construct {
   public readonly name: string;

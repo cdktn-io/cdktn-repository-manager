@@ -8,12 +8,13 @@ import {
   App,
   TerraformStack,
   TerraformOutput,
+  TerraformVariable,
   Annotations,
   Aspects,
   MigrateIds,
   S3BackendConfig,
   S3Backend,
-} from "cdktf";
+} from "cdktn";
 import {
   GitHubActionsRoleStack,
   GithubRepository,
@@ -23,11 +24,10 @@ import {
 } from "./lib";
 import * as fs from "fs";
 import * as path from "path";
-import { TerraformVariable } from "cdktf";
-import { GithubProvider } from "@cdktf/provider-github/lib/provider";
-import { DataGithubTeam } from "@cdktf/provider-github/lib/data-github-team";
-import { ActionsSecret } from "@cdktf/provider-github/lib/actions-secret";
-import { ActionsRepositoryPermissions } from "@cdktf/provider-github/lib/actions-repository-permissions";
+import { GithubProvider } from "@cdktn/provider-github/lib/provider";
+import { DataGithubTeam } from "@cdktn/provider-github/lib/data-github-team";
+import { ActionsSecret } from "@cdktn/provider-github/lib/actions-secret";
+import { ActionsRepositoryPermissions } from "@cdktn/provider-github/lib/actions-repository-permissions";
 
 type StackShards = {
   primaryStack: string;

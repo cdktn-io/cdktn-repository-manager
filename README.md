@@ -27,7 +27,7 @@ We are currently prioritizing publishing a small subset of prebuilt provider pac
 
 ### Local Setup
 
-This repository uses CDKTF to manage GitHub repositories via Terraform. Before running Terraform commands locally, you need to set up authentication:
+This repository uses CDKTN to manage GitHub repositories via Terraform. Before running Terraform commands locally, you need to set up authentication:
 
 ```bash
 # Set GITHUB_TOKEN for Terraform provider authentication
