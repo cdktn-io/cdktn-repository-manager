@@ -133,7 +133,7 @@ jobs:
         run: yarn install
 
       - name: Synth
-        run: "$(yarn bin)/cdktf synth"
+        run: "$(yarn bin)/cdktn synth"
 
       - name: Write Terraform variables
         env:

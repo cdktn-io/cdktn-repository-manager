@@ -69,7 +69,7 @@ jobs:
         run: yarn install
 
       - name: Synth
-        run: "$(yarn bin)/cdktf synth"
+        run: "$(yarn bin)/cdktn synth"
 
       - name: Write Terraform variables
         env:
@@ -97,7 +97,7 @@ jobs:
           echo "$VARS" > "$STACK_DIR/terraform.tfvars.json"
 
       - name: Deploy
-        run: "$(yarn bin)/cdktf deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
+        run: "$(yarn bin)/cdktn deploy --skip-synth --auto-approve '${{ matrix.stack }}'"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           CDKTF_LOG_LEVEL: all
