@@ -9,7 +9,7 @@
   "scripts": {
     "format": "prettier --write '**/*.{ts,js,md,yml}'",
     "get": "cdktn get",
-    "build": "yarn get && tsc",
+    "build": "pnpm run get && tsc",
     "synth": "cdktn synth",
     "compile": "tsc --pretty",
     "watch": "tsc -w",
@@ -18,7 +18,7 @@
     "upgrade": "npm i cdktn@latest cdktn-cli@latest",
     "upgrade:next": "npm i cdktn@next cdktn-cli@next",
     "output": "cd cdktf.out && terraform output -json -state ../terraform.tfstate",
-    "repos": "yarn -s output | jq  'with_entries(select(.key|match(\"providerRepos\";\"i\")))[] | .value'",
+    "repos": "pnpm --silent run output | jq  'with_entries(select(.key|match(\"providerRepos\";\"i\")))[] | .value'",
     "repos:secrets:encrypt": "sops -e cdktf.out/stacks/repos/terraform.tfvars > secrets-encrypted/repos-terraform.tfvars",
     "repos:secrets:decrypt": "sops -d secrets-encrypted/repos-terraform.tfvars > cdktf.out/stacks/repos/terraform.tfvars",
     "official:secrets:encrypt": "sops -e cdktf.out/stacks/repos-official-new/terraform.tfvars > secrets-encrypted/official-terraform.tfvars",
