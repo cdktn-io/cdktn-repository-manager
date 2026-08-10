@@ -24,12 +24,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
       - name: Install
-        run: yarn install
+        run: pnpm install --frozen-lockfile
       - name: Get current Node.js version
         id: current_version
         run: |-
@@ -86,19 +89,22 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: ${{ needs.version.outputs.major }}
+          package-manager-cache: false
       - name: Install
-        run: yarn install
+        run: pnpm install --frozen-lockfile
       - name: Update the package with the new minimum Node version and update @types/node
         env:
           NEW_NODEJS_VERSION: ${{ needs.version.outputs.latest }}
           NEW_NODEJS_VERSION_MAJOR: ${{ needs.version.outputs.major }}
         run: |-
           npm pkg set engines.node=">= $NEW_NODEJS_VERSION"
-          yarn add -D @types/node@~$NEW_NODEJS_VERSION_MAJOR
+          pnpm add -D @types/node@~$NEW_NODEJS_VERSION_MAJOR
       - name: Set the new minNodeVersion in the Projen template
         env:
           NEW_NODEJS_VERSION: ${{ needs.version.outputs.latest }}

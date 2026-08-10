@@ -13,12 +13,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
       - name: Install
-        run: yarn install
+        run: pnpm install --frozen-lockfile
       - name: Get current CDKTF version
         id: current_version
         # NOTE: This uses the version in projenrc.template.js as the source of truth (and not the version of cdktf in the repo-manager's package.json)
@@ -30,14 +33,14 @@ jobs:
       - name: Get latest CDKTF version
         id: latest_version
         run: |-
-          CDKTF_VERSION=$(yarn info cdktn --json | jq -r '.data.version')
+          CDKTF_VERSION=$(pnpm view cdktn --json | jq -r '.version')
           CDKTF_VERSION_MINOR=$(cut -d "." -f 2 <<< "$CDKTF_VERSION")
           # Pass cdktn's constructs peer range through VERBATIM. It is not
           # always caret-style: 0.24.0 ships ">=10.6.0 <10.8.0" (constructs
           # 10.8 disallowed, cdk-terrain#363), and the old caret-stripping +
           # re-prepending produced the invalid "^>=10.6.0 <10.8.0", which
           # broke every provider regen at pnpm install.
-          CONSTRUCTS_VERSION=$(yarn info cdktn --json | jq -r '.data.peerDependencies.constructs')
+          CONSTRUCTS_VERSION=$(pnpm view cdktn --json | jq -r '.peerDependencies.constructs')
           echo "value=$CDKTF_VERSION" >> $GITHUB_OUTPUT
           echo "short=$CDKTF_VERSION_MINOR" >> $GITHUB_OUTPUT
           echo "constructs=$CONSTRUCTS_VERSION" >> $GITHUB_OUTPUT
@@ -117,17 +120,20 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
       - name: Install
-        run: yarn install
+        run: pnpm install --frozen-lockfile
       - name: Do the upgrade
         run: |
-          yarn add cdktn@^$NEW_CDKTF_VERSION
-          yarn add cdktn-cli@^$NEW_CDKTF_VERSION
-          yarn add "constructs@$CONSTRUCTS_VERSION"
+          pnpm add cdktn@^$NEW_CDKTF_VERSION
+          pnpm add cdktn-cli@^$NEW_CDKTF_VERSION
+          pnpm add "constructs@$CONSTRUCTS_VERSION"
         env:
           NEW_CDKTF_VERSION: ${{ needs.check_versions.outputs.latest_version }}
           CONSTRUCTS_VERSION: ${{ needs.check_versions.outputs.constructs }}
@@ -143,7 +149,7 @@ jobs:
             Unfortunately, not everything can be automated, and the following steps need to be completed manually:
 
             - [ ] Wait for #${{ needs.upgrade_repos.outputs.pr_id }} to be merged and for the deployment to succeed
-            - [ ] Upgrade `@cdktn/provider-github` to a version compatible with `cdktn@${{ needs.check_versions.outputs.latest_version }}` (`yarn add ...`)
+            - [ ] Upgrade `@cdktn/provider-github` to a version compatible with `cdktn@${{ needs.check_versions.outputs.latest_version }}` (`pnpm add ...`)
 
             Please checkout this PR, complete the above steps, push the changes to this branch, and then mark this PR as ready for review to complete the upgrade. Thanks!
           labels: automerge,automated,dependencies
