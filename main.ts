@@ -331,6 +331,15 @@ class CustomConstructsStack extends TerraformStack {
       name: string;
       languages: ("typescript" | "python" | "csharp" | "java" | "go")[];
       topics?: string[];
+      /**
+       * Description for the companion `<name>-go` repository, created only
+       * when `languages` includes "go". Defaults to a generic message.
+       * (`GithubRepositoryFromExistingRepository` reads an existing repo via
+       * a data source, so there is no `description` field for the main repo
+       * itself -- GitHub already has whatever description it was created
+       * with.)
+       */
+      goDescription?: string;
     }[],
   ) {
     super(scope, name);
@@ -356,59 +365,62 @@ class CustomConstructsStack extends TerraformStack {
     const secrets = new PublishingSecretSet(this, "secret-set");
 
     // TODO: Re-add license/cla to protectMainChecks ?
-    constructRepos.forEach(({ name: repoName, languages, topics }) => {
-      const protectMainChecks = ["build" ].concat(
-        languages.map((language) => {
-          return `package-${
-            language === "typescript"
-              ? "js"
-              : language === "csharp"
-                ? "dotnet"
-                : language
-          }`;
-        }),
-      );
+    constructRepos.forEach(
+      ({ name: repoName, languages, topics, goDescription }) => {
+        const protectMainChecks = ["build"].concat(
+          languages.map((language) => {
+            return `package-${
+              language === "typescript"
+                ? "js"
+                : language === "csharp"
+                  ? "dotnet"
+                  : language
+            }`;
+          }),
+        );
 
-      const repo = new GithubRepositoryFromExistingRepository(
-        this,
-        `cdktf-construct-${repoName}`,
-        {
-          repositoryName: repoName,
-          team: githubTeam,
-          webhookUrl: slackWebhook.stringValue,
-          provider: githubProvider,
-          protectMain: true,
-          protectMainChecks,
-        },
-      );
+        const repo = new GithubRepositoryFromExistingRepository(
+          this,
+          `cdktn-construct-${repoName}`,
+          {
+            repositoryName: repoName,
+            team: githubTeam,
+            webhookUrl: slackWebhook.stringValue,
+            provider: githubProvider,
+            protectMain: true,
+            protectMainChecks,
+          },
+        );
 
-      secrets.forGitHub(repo.resource, githubProvider);
-      if (languages.includes("typescript")) {
-        secrets.forTypescript(repo.resource, githubProvider);
-      }
-      if (languages.includes("python")) {
-        secrets.forPython(repo.resource, githubProvider);
-      }
-      if (languages.includes("csharp")) {
-        secrets.forCsharp(repo.resource, githubProvider);
-      }
-      if (languages.includes("java")) {
-        secrets.forJava(repo.resource, githubProvider);
-      }
-      if (languages.includes("go")) {
-        secrets.forGo(repo.resource, githubProvider);
+        secrets.forGitHub(repo.resource, githubProvider);
+        if (languages.includes("typescript")) {
+          secrets.forTypescript(repo.resource, githubProvider);
+        }
+        if (languages.includes("python")) {
+          secrets.forPython(repo.resource, githubProvider);
+        }
+        if (languages.includes("csharp")) {
+          secrets.forCsharp(repo.resource, githubProvider);
+        }
+        if (languages.includes("java")) {
+          secrets.forJava(repo.resource, githubProvider);
+        }
+        if (languages.includes("go")) {
+          secrets.forGo(repo.resource, githubProvider);
 
-        // repo to publish go packages to
-        new GithubRepository(this, `${repoName}-go`, {
-          description: `CDK Terrain Go bindings for ${repoName}.`,
-          topics,
-          team: githubTeam,
-          protectMain: false,
-          webhookUrl: slackWebhook.stringValue,
-          provider: githubProvider,
-        });
-      }
-    });
+          // repo to publish go packages to
+          new GithubRepository(this, `${repoName}-go`, {
+            description:
+              goDescription ?? `CDK Terrain Go bindings for ${repoName}.`,
+            topics,
+            team: githubTeam,
+            protectMain: false,
+            webhookUrl: slackWebhook.stringValue,
+            provider: githubProvider,
+          });
+        }
+      },
+    );
   }
 }
 
@@ -467,7 +479,15 @@ stackNames.forEach((stackName) => {
   Aspects.of(providerStack).add(new MigrateIds());
 });
 
-new CustomConstructsStack(app, "custom-constructs", []);
+new CustomConstructsStack(app, "custom-constructs", [
+  {
+    name: "cdktn-awscc",
+    languages: ["typescript", "python", "java", "csharp", "go"],
+    topics: [...GithubRepository.defaultTopics, "awscc", "aws-cdk"],
+    goDescription:
+      "Go bindings for @cdktn/awscc (AWS-CDK-shaped AWSCC bindings)",
+  },
+]);
 new GitHubActionsRoleStack(app, "github-actions-role",{
   environmentName: "CdktnIoRepositories",
   gridUUID: "repo-manager",
