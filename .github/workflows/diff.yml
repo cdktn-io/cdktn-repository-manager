@@ -21,7 +21,10 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
       - id: set-matrix
         run: |
-          stack=$(jq -rcM ".stacks | { stack: keys }" sharded-stacks.json)
+          # custom-constructs isn't a provider shard in sharded-stacks.json --
+          # it manages hand-built construct packages (e.g. cdktn-awscc) via
+          # CustomConstructsStack -- so it's appended here explicitly.
+          stack=$(jq -rcM '.stacks | { stack: (keys + ["custom-constructs"]) }' sharded-stacks.json)
           echo "matrix=$stack" >> $GITHUB_OUTPUT
 
   diff:

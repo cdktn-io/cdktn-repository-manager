@@ -28,6 +28,7 @@ import { GithubProvider } from "@cdktn/provider-github/lib/provider";
 import { DataGithubTeam } from "@cdktn/provider-github/lib/data-github-team";
 import { ActionsSecret } from "@cdktn/provider-github/lib/actions-secret";
 import { ActionsRepositoryPermissions } from "@cdktn/provider-github/lib/actions-repository-permissions";
+import { RepositoryEnvironment } from "@cdktn/provider-github/lib/repository-environment";
 
 type StackShards = {
   primaryStack: string;
@@ -331,6 +332,29 @@ class CustomConstructsStack extends TerraformStack {
       name: string;
       languages: ("typescript" | "python" | "csharp" | "java" | "go")[];
       topics?: string[];
+      /**
+       * Description for the companion `<name>-go` repository, created only
+       * when `languages` includes "go". Defaults to a generic message.
+       * (`GithubRepositoryFromExistingRepository` reads an existing repo via
+       * a data source, so there is no `description` field for the main repo
+       * itself -- GitHub already has whatever description it was created
+       * with.)
+       */
+      goDescription?: string;
+      /**
+       * Overrides the derived `protectMain` required-status-check contexts.
+       *
+       * By default this is `["build", "package-<language>", ...]`, mirroring
+       * the per-language job names projen generates for provider repos. That
+       * default only holds for repos whose CI actually exposes a job per
+       * `languages` entry -- a hand-rolled workflow (no projen boilerplate)
+       * may expose only a single job. Required status checks that never
+       * report leave every PR permanently unmergeable (worse, with
+       * `enforce_admins: true` admins can't override), so verify the repo's
+       * actual `pull_request`-triggered workflow's job names before relying
+       * on the default here.
+       */
+      protectMainChecks?: string[];
     }[],
   ) {
     super(scope, name);
@@ -356,59 +380,80 @@ class CustomConstructsStack extends TerraformStack {
     const secrets = new PublishingSecretSet(this, "secret-set");
 
     // TODO: Re-add license/cla to protectMainChecks ?
-    constructRepos.forEach(({ name: repoName, languages, topics }) => {
-      const protectMainChecks = ["build" ].concat(
-        languages.map((language) => {
-          return `package-${
-            language === "typescript"
-              ? "js"
-              : language === "csharp"
-                ? "dotnet"
-                : language
-          }`;
-        }),
-      );
+    constructRepos.forEach(
+      ({
+        name: repoName,
+        languages,
+        topics,
+        goDescription,
+        protectMainChecks: protectMainChecksOverride,
+      }) => {
+        const protectMainChecks =
+          protectMainChecksOverride ??
+          ["build"].concat(
+            languages.map((language) => {
+              return `package-${
+                language === "typescript"
+                  ? "js"
+                  : language === "csharp"
+                    ? "dotnet"
+                    : language
+              }`;
+            }),
+          );
 
-      const repo = new GithubRepositoryFromExistingRepository(
-        this,
-        `cdktf-construct-${repoName}`,
-        {
-          repositoryName: repoName,
-          team: githubTeam,
-          webhookUrl: slackWebhook.stringValue,
-          provider: githubProvider,
-          protectMain: true,
-          protectMainChecks,
-        },
-      );
+        const repo = new GithubRepositoryFromExistingRepository(
+          this,
+          `cdktn-construct-${repoName}`,
+          {
+            repositoryName: repoName,
+            team: githubTeam,
+            webhookUrl: slackWebhook.stringValue,
+            provider: githubProvider,
+            protectMain: true,
+            protectMainChecks,
+          },
+        );
 
-      secrets.forGitHub(repo.resource, githubProvider);
-      if (languages.includes("typescript")) {
-        secrets.forTypescript(repo.resource, githubProvider);
-      }
-      if (languages.includes("python")) {
-        secrets.forPython(repo.resource, githubProvider);
-      }
-      if (languages.includes("csharp")) {
-        secrets.forCsharp(repo.resource, githubProvider);
-      }
-      if (languages.includes("java")) {
-        secrets.forJava(repo.resource, githubProvider);
-      }
-      if (languages.includes("go")) {
-        secrets.forGo(repo.resource, githubProvider);
+        secrets.forGitHub(repo.resource, githubProvider);
+        if (languages.includes("typescript")) {
+          secrets.forTypescript(repo.resource, githubProvider);
+        }
+        if (languages.includes("python")) {
+          secrets.forPython(repo.resource, githubProvider);
 
-        // repo to publish go packages to
-        new GithubRepository(this, `${repoName}-go`, {
-          description: `CDK Terrain Go bindings for ${repoName}.`,
-          topics,
-          team: githubTeam,
-          protectMain: false,
-          webhookUrl: slackWebhook.stringValue,
-          provider: githubProvider,
-        });
-      }
-    });
+          // release.yml's release_pypi job runs with `environment: pypi`
+          // (PyPI trusted publishing / OIDC) -- that job silently fails to
+          // start on the first release unless the environment already
+          // exists on the repo.
+          new RepositoryEnvironment(this, `${repoName}-pypi-environment`, {
+            environment: "pypi",
+            repository: repo.resource.name,
+            provider: githubProvider,
+          });
+        }
+        if (languages.includes("csharp")) {
+          secrets.forCsharp(repo.resource, githubProvider);
+        }
+        if (languages.includes("java")) {
+          secrets.forJava(repo.resource, githubProvider);
+        }
+        if (languages.includes("go")) {
+          secrets.forGo(repo.resource, githubProvider);
+
+          // repo to publish go packages to
+          new GithubRepository(this, `${repoName}-go`, {
+            description:
+              goDescription ?? `CDK Terrain Go bindings for ${repoName}.`,
+            topics,
+            team: githubTeam,
+            protectMain: false,
+            webhookUrl: slackWebhook.stringValue,
+            provider: githubProvider,
+          });
+        }
+      },
+    );
   }
 }
 
@@ -467,7 +512,33 @@ stackNames.forEach((stackName) => {
   Aspects.of(providerStack).add(new MigrateIds());
 });
 
-new CustomConstructsStack(app, "custom-constructs", []);
+new CustomConstructsStack(app, "custom-constructs", [
+  {
+    name: "cdktn-awscc",
+    languages: ["typescript", "python", "java", "csharp", "go"],
+    // cdktn-awscc is hand-authored (jsii + jsii-pacmak), not a generated
+    // provider binding -- drop the provider-repo-only topics that
+    // GithubRepository.defaultTopics carries.
+    topics: [
+      ...GithubRepository.defaultTopics.filter(
+        (topic) => topic !== "provider" && topic !== "pre-built-provider",
+      ),
+      "awscc",
+      "aws-cdk",
+    ],
+    goDescription:
+      "Go bindings for @cdktn/awscc (AWS-CDK-shaped AWSCC bindings)",
+    // cdktn-awscc has no projen boilerplate and no per-language build
+    // matrix: build.yml's only pull_request-triggered job is `build`
+    // (verified against cdktn-io/cdktn-awscc@feat/ci-release). The
+    // package-js/package-python/package-java/package-dotnet/package-go
+    // contexts the default derivation would produce never report on a PR,
+    // which -- combined with enforce_admins: true -- would make every PR
+    // (including admin merges) permanently unmergeable. Revisit this once
+    // that repo's build.yml exposes a check per language.
+    protectMainChecks: ["build"],
+  },
+]);
 new GitHubActionsRoleStack(app, "github-actions-role",{
   environmentName: "CdktnIoRepositories",
   gridUUID: "repo-manager",

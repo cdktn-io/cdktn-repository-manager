@@ -22,7 +22,9 @@
     "repos:secrets:encrypt": "sops -e cdktf.out/stacks/repos/terraform.tfvars > secrets-encrypted/repos-terraform.tfvars",
     "repos:secrets:decrypt": "sops -d secrets-encrypted/repos-terraform.tfvars > cdktf.out/stacks/repos/terraform.tfvars",
     "official:secrets:encrypt": "sops -e cdktf.out/stacks/repos-official-new/terraform.tfvars > secrets-encrypted/official-terraform.tfvars",
-    "official:secrets:decrypt": "sops -d secrets-encrypted/official-terraform.tfvars > cdktf.out/stacks/repos-official-new/terraform.tfvars"
+    "official:secrets:decrypt": "sops -d secrets-encrypted/official-terraform.tfvars > cdktf.out/stacks/repos-official-new/terraform.tfvars",
+    "custom-constructs:secrets:encrypt": "sops -e cdktf.out/stacks/custom-constructs/terraform.tfvars > secrets-encrypted/custom-constructs-terraform.tfvars",
+    "custom-constructs:secrets:decrypt": "sops -d secrets-encrypted/custom-constructs-terraform.tfvars > cdktf.out/stacks/custom-constructs/terraform.tfvars"
   },
   "engines": {
     "node": ">= 24"
