@@ -538,6 +538,52 @@ new CustomConstructsStack(app, "custom-constructs", [
     // that repo's build.yml exposes a check per language.
     protectMainChecks: ["build"],
   },
+  {
+    name: "cdktn-aws",
+    languages: ["typescript", "python", "java", "csharp", "go"],
+    // cdktn-aws is hand-authored tooling (jsii + jsii-pacmak) that regroups
+    // terraform-provider-aws into per-service modules -- it is not one of the
+    // projen-generated `cdktn-provider-*` packages, and `cdktn-provider-aws`
+    // already carries the provider/pre-built-provider topics for the AWS
+    // provider. Keeping them here too would make the two AWS repos
+    // indistinguishable in topic search, so drop them (same call as
+    // cdktn-awscc above).
+    topics: [
+      ...GithubRepository.defaultTopics.filter(
+        (topic) => topic !== "provider" && topic !== "pre-built-provider",
+      ),
+      "aws",
+      "aws-cdk",
+    ],
+    goDescription:
+      "Go bindings for @cdktn/aws (terraform-provider-aws regrouped into service modules)",
+    // Verified against cdktn-io/cdktn-aws's actual ci.yml (the only
+    // pull_request-triggered workflow) -- these are the job `name:` values,
+    // which is what GitHub reports as the check context. The default
+    // package-js/package-python/... derivation does not apply: cdktn-aws has
+    // no projen boilerplate and no per-language build matrix.
+    //
+    // The last two names are the reconcile jobs that `needs:` the sharded
+    // matrices (`jsii shard N/8`, `pacmak + size shard N/8`); the 10 matrix
+    // children are deliberately not listed, because matrix-expanded context
+    // names go stale the moment ci.yml re-shards.
+    //
+    // That substitution only holds because ci.yml makes those two jobs run
+    // and fail when a shard is red: each carries `if: ${{ !cancelled() }}`
+    // plus a first step asserting `needs.<matrix>.result == 'success'`.
+    // Without that pair the reconcile job would be *skipped* when a shard
+    // fails, and GitHub reports a skipped job to branch protection as
+    // passing -- so a red CI run would leave all five required contexts
+    // green. If either guard is ever removed from ci.yml, this list must
+    // grow to the 10 shard contexts.
+    protectMainChecks: [
+      "typecheck, tests and invariants",
+      "groups, generate determinism and runtime contract",
+      "synth smoke (validation on)",
+      "every group compiled exactly once, JSII3/JSII6 zero",
+      "PR size coverage (2 of 8 shards)",
+    ],
+  },
 ]);
 new GitHubActionsRoleStack(app, "github-actions-role",{
   environmentName: "CdktnIoRepositories",
