@@ -14,6 +14,7 @@ import {
   MigrateIds,
   S3BackendConfig,
   S3Backend,
+  Token,
 } from "cdktn";
 import {
   GitHubActionsRoleStack,
@@ -355,6 +356,34 @@ class CustomConstructsStack extends TerraformStack {
        * on the default here.
        */
       protectMainChecks?: string[];
+      /**
+       * Puts this repository's publishing behind a GitHub deployment
+       * environment. Opt-in, and only correct for repositories whose release
+       * workflow is dispatched from a *branch*.
+       *
+       * When true:
+       * - a `release` environment is created, and both it and the `pypi`
+       *   environment are restricted to protected branches (i.e. `main`,
+       *   which `protectMain: true` protects) with `team-cdk-terrain` as
+       *   required reviewer;
+       * - the credentials only a release job reads (MAVEN_*, NUGET_API_KEY,
+       *   GO_GITHUB_TOKEN) become environment secrets of `release` instead
+       *   of repo-level Actions secrets, so a job that does not declare
+       *   `environment: release` cannot read them at all.
+       *
+       * This is the infrastructure half of the cdktn-aws PR #1 security
+       * review finding: with repo-level publishing secrets and no
+       * environment, anyone able to dispatch release.yml from an arbitrary
+       * branch runs attacker-controlled code with those credentials in
+       * scope.
+       *
+       * NOT enabled for cdktn-awscc, deliberately: its release.yml is
+       * triggered by `push: tags: ["v*"]`, and a "protected branches only"
+       * deployment policy rejects a run whose ref is a tag -- turning this
+       * on there would block every tag release. A repo that gains a tag
+       * trigger later needs a custom branch/tag policy instead of this flag.
+       */
+      protectedReleaseEnvironment?: boolean;
     }[],
   ) {
     super(scope, name);
@@ -387,6 +416,7 @@ class CustomConstructsStack extends TerraformStack {
         topics,
         goDescription,
         protectMainChecks: protectMainChecksOverride,
+        protectedReleaseEnvironment = false,
       }) => {
         const protectMainChecks =
           protectMainChecksOverride ??
@@ -415,7 +445,54 @@ class CustomConstructsStack extends TerraformStack {
           },
         );
 
-        secrets.forGitHub(repo.resource, githubProvider);
+        // Deployment protection shared by every environment of a repo that
+        // opted in: only refs of protected branches (i.e. `main`) may deploy,
+        // and a team-cdk-terrain member has to approve the run.
+        //
+        // `preventSelfReview: false` because the team is small enough that
+        // the person dispatching a release is usually the only one who can
+        // approve it; true would deadlock every release. `canAdminsBypass:
+        // false` so the approval is not silently optional for the admins who
+        // do the releasing -- the branch policy, not the click, is the actual
+        // control, but a bypassable gate is worse than an honest one.
+        const deploymentProtection = protectedReleaseEnvironment
+          ? {
+              deploymentBranchPolicy: {
+                protectedBranches: true,
+                customBranchPolicies: false,
+              },
+              reviewers: {
+                // github_repository_environment wants numeric team IDs;
+                // data.github_team's id *is* the numeric ID, as a string.
+                teams: [Token.asNumber(githubTeam.id)],
+              },
+              canAdminsBypass: false,
+              preventSelfReview: false,
+            }
+          : {};
+
+        // release.yml's publishing jobs run with `environment: release`; the
+        // credentials they need live in this environment rather than on the
+        // repository, so a job dispatched from another branch -- or a job
+        // that just omits the environment -- cannot read them.
+        const releaseEnvironmentName = "release";
+        const releaseEnvironment = protectedReleaseEnvironment
+          ? {
+              name: releaseEnvironmentName,
+              resource: new RepositoryEnvironment(
+                this,
+                `${repoName}-${releaseEnvironmentName}-environment`,
+                {
+                  environment: releaseEnvironmentName,
+                  repository: repo.resource.name,
+                  provider: githubProvider,
+                  ...deploymentProtection,
+                },
+              ),
+            }
+          : undefined;
+
+        secrets.forGitHub(repo.resource, githubProvider, releaseEnvironment);
         if (languages.includes("typescript")) {
           secrets.forTypescript(repo.resource, githubProvider);
         }
@@ -430,13 +507,14 @@ class CustomConstructsStack extends TerraformStack {
             environment: "pypi",
             repository: repo.resource.name,
             provider: githubProvider,
+            ...deploymentProtection,
           });
         }
         if (languages.includes("csharp")) {
-          secrets.forCsharp(repo.resource, githubProvider);
+          secrets.forCsharp(repo.resource, githubProvider, releaseEnvironment);
         }
         if (languages.includes("java")) {
-          secrets.forJava(repo.resource, githubProvider);
+          secrets.forJava(repo.resource, githubProvider, releaseEnvironment);
         }
         if (languages.includes("go")) {
           secrets.forGo(repo.resource, githubProvider);
@@ -583,6 +661,13 @@ new CustomConstructsStack(app, "custom-constructs", [
       "every group compiled exactly once, JSII3/JSII6 zero",
       "PR size coverage (2 of 8 shards)",
     ],
+    // release.yml is workflow_dispatch-only today, so restricting deployments
+    // to protected branches costs nothing and closes the PR #1 review finding
+    // (dispatch from an arbitrary branch reaching the publish credentials).
+    // If the tag trigger that release.yml's header describes as future state
+    // is ever added, this flag has to become a custom branch/tag policy --
+    // "protected branches only" refuses a run whose ref is a tag.
+    protectedReleaseEnvironment: true,
   },
 ]);
 new GitHubActionsRoleStack(app, "github-actions-role",{
