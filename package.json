@@ -30,20 +30,20 @@
     "node": ">= 24"
   },
   "dependencies": {
-    "@cdktn/provider-github": "^18.0.0",
-    "@cdktn/provider-aws": "^25.0.0",
-    "@cdktn/provider-time": "14.0.0",
+    "@aws-cdk/cloud-assembly-schema": "^49.4.0",
+    "@aws-cdk/region-info": "*",
     "@cdktn/provider-archive": "^14.0.0",
+    "@cdktn/provider-aws": "^25.0.0",
     "@cdktn/provider-cloudinit": "^14.0.0",
     "@cdktn/provider-docker": "^16.0.0",
+    "@cdktn/provider-github": "^18.0.0",
+    "@cdktn/provider-time": "14.0.0",
     "@cdktn/provider-tls": "^14.0.0",
     "cdktn": "^0.24.0",
     "cdktn-cli": "^0.24.0",
     "change-case": "~4.1.2",
     "constructs": ">=10.6.0 <10.8.0",
-    "terraconstructs": "0.2.15",
-    "@aws-cdk/region-info": "*",
-    "@aws-cdk/cloud-assembly-schema": "^49.4.0"
+    "terraconstructs": "0.2.15"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -53,7 +53,7 @@
     "lint-staged": "^15.5.2",
     "prettier": "^3",
     "tsx": "^4.0.0",
-    "typescript": "~5.8.0"
+    "typescript": "~5.9.3"
   },
   "lint-staged": {
     "*.{md,yml}": "prettier --write",
