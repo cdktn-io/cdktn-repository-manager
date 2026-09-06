@@ -12,13 +12,52 @@ jobs:
   lock:
     runs-on: ubuntu-latest
     steps:
-      - uses: dessant/lock-threads@1bf7ec25051fe7c00bdd17e6a7cf3d7bfb7dc771 # v5.0.1
+      # Discussions aren't handled here: this repo has the Discussions feature
+      # disabled, and locking them requires the GraphQL API rather than REST.
+      - name: Lock closed issues and PRs after 30 days of inactivity
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
-          issue-comment: >
-            I'm going to lock this issue because it has been closed for at least 30 days. This helps our maintainers find and focus on the active issues.
-            If you've found a problem that seems similar to this, please [open a new issue](https://github.com/cdktn-io/cdktn-repository-manager/issues/new) so we can investigate further.
-          issue-inactive-days: 30
-          pr-comment: >
-            I'm going to lock this pull request because it has been closed for at least 30 days. This helps our maintainers find and focus on the active issues.
-            If you've found a problem that seems related to this change, please [open a new issue](https://github.com/cdktn-io/cdktn-repository-manager/issues/new) so we can investigate further.
-          pr-inactive-days: 30
+          script: |-
+            const INACTIVE_DAYS = 30;
+            const LOCK_REASON = "resolved";
+
+            const cutoff = new Date();
+            cutoff.setUTCDate(cutoff.getUTCDate() - INACTIVE_DAYS);
+            const cutoffDate = cutoff.toISOString().slice(0, 10);
+
+            const comments = {
+              issue:
+                "I'm going to lock this issue because it has been closed for at least 30 days. This helps our maintainers find and focus on the active issues. " +
+                "If you've found a problem that seems similar to this, please [open a new issue](https://github.com/cdktn-io/cdktn-repository-manager/issues/new) so we can investigate further.",
+              pr:
+                "I'm going to lock this pull request because it has been closed for at least 30 days. This helps our maintainers find and focus on the active issues. " +
+                "If you've found a problem that seems related to this change, please [open a new issue](https://github.com/cdktn-io/cdktn-repository-manager/issues/new) so we can investigate further.",
+            };
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            for (const kind of ["issue", "pr"]) {
+              const items = await github.paginate(github.rest.search.issuesAndPullRequests, {
+                q: `repo:${context.repo.owner}/${context.repo.repo} is:closed is:unlocked is:${kind} closed:<${cutoffDate}`,
+                per_page: 100,
+              });
+
+              core.info(`Found ${items.length} closed, unlocked ${kind}(s) closed before ${cutoffDate}`);
+
+              for (const item of items) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: item.number,
+                  body: comments[kind],
+                });
+                await github.rest.issues.lock({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: item.number,
+                  lock_reason: LOCK_REASON,
+                });
+                core.info(`Locked ${kind} #${item.number}`);
+                await sleep(250);
+              }
+            }
