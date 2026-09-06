@@ -9,6 +9,7 @@
         "acme",
         "archive",
         "aws",
+        "azapi",
         "azuread",
         "azurerm",
         "cfncompat",
