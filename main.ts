@@ -653,6 +653,10 @@ new CustomConstructsStack(app, "custom-constructs", [
       "synth smoke (validation on)",
       "every group compiled exactly once, JSII3/JSII6 zero",
       "PR size coverage (2 of 8 shards)",
+      // The migration tool's own job: re-runs @cdktn/aws-migrate on the
+      // worked example and proves the migrated synth equals the golden. A
+      // light ubuntu-latest job with no matrix, so its name is stable.
+      "migration tool and worked example",
     ],
     // release.yml is workflow_dispatch-only today, so restricting deployments
     // to protected branches costs nothing and closes the PR #1 review finding
