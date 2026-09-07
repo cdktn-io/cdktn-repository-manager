@@ -14,7 +14,6 @@ import {
   MigrateIds,
   S3BackendConfig,
   S3Backend,
-  Token,
 } from "cdktn";
 import {
   GitHubActionsRoleStack,
@@ -446,28 +445,22 @@ class CustomConstructsStack extends TerraformStack {
         );
 
         // Deployment protection shared by every environment of a repo that
-        // opted in: only refs of protected branches (i.e. `main`) may deploy,
-        // and a team-cdk-terrain member has to approve the run.
-        //
-        // `preventSelfReview: false` because the team is small enough that
-        // the person dispatching a release is usually the only one who can
-        // approve it; true would deadlock every release. `canAdminsBypass:
-        // false` so the approval is not silently optional for the admins who
-        // do the releasing -- the branch policy, not the click, is the actual
-        // control, but a bypassable gate is worse than an honest one.
+        // opted in: only refs of protected branches (i.e. `main`) may deploy.
+        // The branch policy is the actual control -- a workflow dispatched
+        // from an arbitrary branch cannot enter the environment, so it can
+        // read none of the environment-scoped publish secrets. A required-
+        // reviewers rule existed briefly on top of this and was dropped
+        // (2026-09-02): with a small team the person dispatching the release
+        // was the same person clicking approve, which is ceremony, not
+        // control. `canAdminsBypass: false` stays so the branch policy is
+        // not silently optional for admins.
         const deploymentProtection = protectedReleaseEnvironment
           ? {
               deploymentBranchPolicy: {
                 protectedBranches: true,
                 customBranchPolicies: false,
               },
-              reviewers: {
-                // github_repository_environment wants numeric team IDs;
-                // data.github_team's id *is* the numeric ID, as a string.
-                teams: [Token.asNumber(githubTeam.id)],
-              },
               canAdminsBypass: false,
-              preventSelfReview: false,
             }
           : {};
 
