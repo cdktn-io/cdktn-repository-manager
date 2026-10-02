@@ -296,12 +296,31 @@ jobs:
           # is how undici GHSA-rfgv-xxqx-mfg5 reddened all 31 repos. Naming packages
           # leaves package.json alone; a bare `pnpm update` rewrites declared ranges.
           # Cooldown stays on per #60 -- minimumReleaseAgeExclude is the waiver.
-          VULN=$(pnpm audit --audit-level high --json 2>/dev/null \
-            | jq -r '[.advisories[]?.module_name] | unique | join(" ")' || true)
+          #
+          # Validate the payload, not the exit status: audit exits non-zero both when
+          # it finds advisories and when it cannot reach the registry, and a crash
+          # yields empty stdout that jq happily reduces to "". Treating that as "clean"
+          # would push an upgrade PR with the flagged transitive still pinned, which is
+          # the exact failure this step exists to prevent. A clean audit still returns
+          # an empty advisories object, so its absence means the audit did not run.
+          AUDIT_ERR=$(mktemp)
+          AUDIT=$(pnpm audit --audit-level high --json 2>"$AUDIT_ERR" || true)
+          # The -z guard is load-bearing: `jq -e` exits 0 on empty input, so a crashed
+          # audit would otherwise sail through this check as if it were clean.
+          if [ -z "$AUDIT" ] || ! jq -e 'has("advisories")' >/dev/null 2>&1 <<<"$AUDIT"; then
+            echo "::error::pnpm audit returned no advisories object; refusing to open an upgrade PR that may still pin a flagged transitive"
+            cat "$AUDIT_ERR" >&2
+            rm -f "$AUDIT_ERR"
+            exit 1
+          fi
+          rm -f "$AUDIT_ERR"
+          VULN=$(jq -r '[.advisories[]?.module_name] | unique | join(" ")' <<<"$AUDIT")
           if [ -n "$VULN" ]; then
             echo "refreshing flagged transitives: $VULN"
+            # Tolerated, and kept distinct from the audit failure above: the only patch
+            # may still be inside the cooldown, which must not abort the fleet upgrade.
             pnpm update $VULN --depth Infinity --config.minimum-release-age=5760 \
-              || echo "could not refresh $VULN within the cooldown; lockfile unchanged"
+              || echo "::warning::could not refresh $VULN within the cooldown; lockfile unchanged"
           fi
           # MUST be `pnpm run fetch`, never `pnpm fetch`: the latter is a pnpm builtin
           # that fetches from the lockfile, exits 0, and generates no bindings -- the
