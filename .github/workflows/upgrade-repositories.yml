@@ -289,34 +289,19 @@ jobs:
           # the `npx projen` on the line above rewrites package.json, so a frozen
           # install would fail with ERR_PNPM_OUTDATED_LOCKFILE. Explicit here too.
           pnpm install --no-frozen-lockfile
-          # Transitive-only lockfile refresh. `pnpm update` re-resolves only the
-          # packages it is named, and neither `pnpm add` above nor projen's upgrade
-          # task names transitives -- so a flagged transitive stays pinned while the
-          # build's `pnpm audit --audit-level high` gate fails on it, which makes the
-          # upgrade PR unmergeable (`build` is a required check, enforce_admins on).
-          #
-          # Derived from the audit rather than hardcoded per package: this started as
-          # `pnpm update brace-expansion` for GHSA-rgw5-rvv9-x895, then undici
-          # GHSA-rfgv-xxqx-mfg5 reddened all 31 repos on 2026-09-29 because it was not
-          # on the list. cdktn-provider-project#55 fixes the recurrence in the
-          # generated upgrade task; this stays as the lever that unblocks repos whose
-          # committed lockfile is already flagged.
-          #
-          # Naming the packages keeps package.json untouched. A bare `pnpm update`
-          # would also fix the lockfile but rewrites declared ranges -- including
-          # turning the deliberate `constructs` ">=10.6.0 <10.8.0" bound into a caret.
+          # Transitive-only lockfile refresh. `pnpm update` re-resolves only what it
+          # is named, and nothing above names transitives -- so a flagged transitive
+          # stays pinned while the build's audit gate fails on it, leaving the upgrade
+          # PR unmergeable. Derived from the audit rather than a hardcoded list, which
+          # is how undici GHSA-rfgv-xxqx-mfg5 reddened all 31 repos. Naming packages
+          # leaves package.json alone; a bare `pnpm update` rewrites declared ranges.
+          # Cooldown stays on per #60 -- minimumReleaseAgeExclude is the waiver.
           VULN=$(pnpm audit --audit-level high --json 2>/dev/null \
             | jq -r '[.advisories[]?.module_name] | unique | join(" ")' || true)
           if [ -n "$VULN" ]; then
             echo "refreshing flagged transitives: $VULN"
-            # No cooldown flag here, matching the line this replaces: this is the
-            # on-demand unblock path, and refusing a patch younger than the 4-day
-            # cooldown would leave the fleet red with no way out. The generated
-            # upgrade task does apply the cooldown.
-            pnpm update $VULN --depth Infinity \
-              || echo "could not refresh $VULN; leaving the lockfile as committed"
-          else
-            echo "no high+ advisories in the committed lockfile"
+            pnpm update $VULN --depth Infinity --config.minimum-release-age=5760 \
+              || echo "could not refresh $VULN within the cooldown; lockfile unchanged"
           fi
           # MUST be `pnpm run fetch`, never `pnpm fetch`: the latter is a pnpm builtin
           # that fetches from the lockfile, exits 0, and generates no bindings -- the
