@@ -303,18 +303,20 @@ jobs:
           # would push an upgrade PR with the flagged transitive still pinned, which is
           # the exact failure this step exists to prevent. A clean audit still returns
           # an empty advisories object, so its absence means the audit did not run.
-          AUDIT_ERR=$(mktemp)
-          AUDIT=$(pnpm audit --audit-level high --json 2>"$AUDIT_ERR" || true)
-          # The -z guard is load-bearing: `jq -e` exits 0 on empty input, so a crashed
+          # POSIX sh, not bash: this is a container job, so `run` defaults to sh and
+          # a here-string would not parse. Temp files keep it portable.
+          AUDIT_OUT=$(mktemp); AUDIT_ERR=$(mktemp)
+          pnpm audit --audit-level high --json >"$AUDIT_OUT" 2>"$AUDIT_ERR" || true
+          # The -s guard is load-bearing: `jq -e` exits 0 on empty input, so a crashed
           # audit would otherwise sail through this check as if it were clean.
-          if [ -z "$AUDIT" ] || ! jq -e 'has("advisories")' >/dev/null 2>&1 <<<"$AUDIT"; then
+          if [ ! -s "$AUDIT_OUT" ] || ! jq -e 'has("advisories")' "$AUDIT_OUT" >/dev/null 2>&1; then
             echo "::error::pnpm audit returned no advisories object; refusing to open an upgrade PR that may still pin a flagged transitive"
             cat "$AUDIT_ERR" >&2
-            rm -f "$AUDIT_ERR"
+            rm -f "$AUDIT_OUT" "$AUDIT_ERR"
             exit 1
           fi
-          rm -f "$AUDIT_ERR"
-          VULN=$(jq -r '[.advisories[]?.module_name] | unique | join(" ")' <<<"$AUDIT")
+          VULN=$(jq -r '[.advisories[]?.module_name] | unique | join(" ")' "$AUDIT_OUT")
+          rm -f "$AUDIT_OUT" "$AUDIT_ERR"
           if [ -n "$VULN" ]; then
             echo "refreshing flagged transitives: $VULN"
             # Tolerated, and kept distinct from the audit failure above: the only patch
