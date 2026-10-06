@@ -14,6 +14,7 @@ import {
   MigrateIds,
   S3BackendConfig,
   S3Backend,
+  Token,
 } from "cdktn";
 import {
   GitHubActionsRoleStack,
@@ -376,8 +377,7 @@ class CustomConstructsStack extends TerraformStack {
        * When true:
        * - a `release` environment is created, and both it and the `pypi`
        *   environment are restricted to protected branches (i.e. `main`,
-       *   which `protectMain: true` protects) with `team-cdk-terrain` as
-       *   required reviewer;
+       *   which `protectMain: true` protects);
        * - the credentials only a release job reads (MAVEN_*, NUGET_API_KEY,
        *   GO_GITHUB_TOKEN) become environment secrets of `release` instead
        *   of repo-level Actions secrets, so a job that does not declare
@@ -396,6 +396,31 @@ class CustomConstructsStack extends TerraformStack {
        * trigger later needs a custom branch/tag policy instead of this flag.
        */
       protectedReleaseEnvironment?: boolean;
+      /**
+       * Adds a required-approval rule to the `release` and `pypi`
+       * environments: a `team-cdk-terrain` member other than the person who
+       * triggered the run (`preventSelfReview`) must approve it before any
+       * job in those environments starts or can read their secrets.
+       * Requires `protectedReleaseEnvironment`.
+       *
+       * Off by default: it was dropped for the experimental cdktn-aws (#87),
+       * where the dispatcher approving their own run was ceremony.
+       * `preventSelfReview` is what makes it a second-person check -- and
+       * also why every release then needs a second team member available.
+       */
+      requireReleaseApproval?: boolean;
+      /**
+       * Moves the token-based registry credentials that trusted publishing
+       * (OIDC) replaces -- NPM_TOKEN and TWINE_USERNAME/TWINE_PASSWORD -- from
+       * repo-level secrets to environment secrets: NPM_TOKEN into `release`,
+       * TWINE_* into `pypi` (the environment the PyPI publish job runs in).
+       * Requires `protectedReleaseEnvironment`.
+       *
+       * They are still provisioned rather than dropped because a package
+       * has to exist before npm trusted publishing can be configured for it,
+       * so the first npm publish of each package is token-based.
+       */
+      environmentScopedRegistryTokens?: boolean;
     }[],
   ) {
     super(scope, name);
@@ -431,7 +456,18 @@ class CustomConstructsStack extends TerraformStack {
         goDescription,
         protectMainChecks: protectMainChecksOverride,
         protectedReleaseEnvironment = false,
+        requireReleaseApproval = false,
+        environmentScopedRegistryTokens = false,
       }) => {
+        if (
+          !protectedReleaseEnvironment &&
+          (requireReleaseApproval || environmentScopedRegistryTokens)
+        ) {
+          throw new Error(
+            `${repoName}: requireReleaseApproval and environmentScopedRegistryTokens require protectedReleaseEnvironment`,
+          );
+        }
+
         const protectMainChecks =
           protectMainChecksOverride ??
           ["build"].concat(
@@ -487,7 +523,9 @@ class CustomConstructsStack extends TerraformStack {
         // (2026-09-02): with a small team the person dispatching the release
         // was the same person clicking approve, which is ceremony, not
         // control. `canAdminsBypass: false` stays so the branch policy is
-        // not silently optional for admins.
+        // not silently optional for admins. Repos that do want an approval
+        // gate opt back in with `requireReleaseApproval`, which pairs it with
+        // `preventSelfReview` so the approver is a second person.
         const deploymentProtection = protectedReleaseEnvironment
           ? {
               deploymentBranchPolicy: {
@@ -495,6 +533,16 @@ class CustomConstructsStack extends TerraformStack {
                 customBranchPolicies: false,
               },
               canAdminsBypass: false,
+              ...(requireReleaseApproval
+                ? {
+                    reviewers: {
+                      // github_repository_environment wants numeric team IDs;
+                      // data.github_team's id *is* the numeric ID, as a string.
+                      teams: [Token.asNumber(githubTeam.id)],
+                    },
+                    preventSelfReview: true,
+                  }
+                : {}),
             }
           : {};
 
@@ -521,21 +569,37 @@ class CustomConstructsStack extends TerraformStack {
 
         secrets.forGitHub(repo.resource, githubProvider, releaseEnvironment);
         if (languages.includes("typescript")) {
-          secrets.forTypescript(repo.resource, githubProvider);
+          secrets.forTypescript(
+            repo.resource,
+            githubProvider,
+            environmentScopedRegistryTokens ? releaseEnvironment : undefined,
+          );
         }
         if (languages.includes("python")) {
-          secrets.forPython(repo.resource, githubProvider);
-
           // release.yml's release_pypi job runs with `environment: pypi`
           // (PyPI trusted publishing / OIDC) -- that job silently fails to
           // start on the first release unless the environment already
           // exists on the repo.
-          new RepositoryEnvironment(this, `${repoName}-pypi-environment`, {
-            environment: "pypi",
-            repository: repo.resource.name,
-            provider: githubProvider,
-            ...deploymentProtection,
-          });
+          const pypiEnvironmentName = "pypi";
+          const pypiEnvironment = {
+            name: pypiEnvironmentName,
+            resource: new RepositoryEnvironment(
+              this,
+              `${repoName}-pypi-environment`,
+              {
+                environment: pypiEnvironmentName,
+                repository: repo.resource.name,
+                provider: githubProvider,
+                ...deploymentProtection,
+              },
+            ),
+          };
+
+          secrets.forPython(
+            repo.resource,
+            githubProvider,
+            environmentScopedRegistryTokens ? pypiEnvironment : undefined,
+          );
         }
         if (languages.includes("csharp")) {
           secrets.forCsharp(repo.resource, githubProvider, releaseEnvironment);
@@ -726,6 +790,13 @@ new CustomConstructsStack(app, "custom-constructs", [
     // the release trigger must be a branch (push to / dispatch on main) -- a
     // tag-triggered release is rejected by the protected-branches policy.
     protectedReleaseEnvironment: true,
+    // A long-lived team repo, not an experiment like cdktn-aws (#87): a
+    // second team member approves each release.
+    requireReleaseApproval: true,
+    // No release has run yet, so nothing depends on repo-level NPM_TOKEN /
+    // TWINE_*. NPM_TOKEN is kept (in `release`) for each package's first,
+    // pre-trusted-publishing publish.
+    environmentScopedRegistryTokens: true,
   },
 ]);
 new GitHubActionsRoleStack(app, "github-actions-role",{

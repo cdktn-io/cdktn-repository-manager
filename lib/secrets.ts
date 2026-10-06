@@ -155,13 +155,18 @@ export class PublishingSecretSet extends Construct {
     // environment (see `SecretFromVariableOptions.releaseScoped`), and stay
     // repo-level everywhere else.
     //
-    // Not in this set, deliberately: `npm-token` and `twine-*`, because the
-    // TypeScript/Python publishes have moved to OIDC trusted publishing and
-    // these are only still provisioned as a fallback; and `gh-token` /
-    // `gh-app-*`, which projen's non-release workflows (upgrade, auto-merge)
-    // read on every provider repo. `gh-token`'s GO_GITHUB_TOKEN alias is
-    // marked individually below.
+    // `npm-token` and `twine-*` are only read by publish jobs too, but are
+    // OIDC fallbacks rather than primary credentials: callers decide per repo
+    // whether to pass an environment for them (forTypescript / forPython),
+    // and most do not, which keeps them repo-level.
+    //
+    // Not in this set, deliberately: `gh-token` / `gh-app-*`, which projen's
+    // non-release workflows (upgrade, auto-merge) read on every provider
+    // repo. `gh-token`'s GO_GITHUB_TOKEN alias is marked individually below.
     const releaseScoped = new Set([
+      "npm-token",
+      "twine-username",
+      "twine-password",
       "nuget-api-key",
       "maven-username",
       "maven-password",
