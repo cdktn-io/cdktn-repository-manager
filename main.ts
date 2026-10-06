@@ -333,12 +333,25 @@ class CustomConstructsStack extends TerraformStack {
       languages: ("typescript" | "python" | "csharp" | "java" | "go")[];
       topics?: string[];
       /**
+       * When true, the main repository is created and owned by this stack (a
+       * `GithubRepository` / `github_repository` resource) instead of being
+       * adopted from an existing repository via a data source read. Use it
+       * for repositories that do not exist yet. Requires `description`.
+       *
+       * When false (the default) the repository must already exist on
+       * GitHub: `GithubRepositoryFromExistingRepository` only reads it.
+       */
+      createRepository?: boolean;
+      /**
+       * Description of the main repository. Only valid with
+       * `createRepository: true` -- an adopted repository keeps whatever
+       * description it was created with, since there is no resource to set
+       * it on.
+       */
+      description?: string;
+      /**
        * Description for the companion `<name>-go` repository, created only
        * when `languages` includes "go". Defaults to a generic message.
-       * (`GithubRepositoryFromExistingRepository` reads an existing repo via
-       * a data source, so there is no `description` field for the main repo
-       * itself -- GitHub already has whatever description it was created
-       * with.)
        */
       goDescription?: string;
       /**
@@ -413,6 +426,8 @@ class CustomConstructsStack extends TerraformStack {
         name: repoName,
         languages,
         topics,
+        createRepository = false,
+        description,
         goDescription,
         protectMainChecks: protectMainChecksOverride,
         protectedReleaseEnvironment = false,
@@ -431,18 +446,37 @@ class CustomConstructsStack extends TerraformStack {
             }),
           );
 
-        const repo = new GithubRepositoryFromExistingRepository(
-          this,
-          `cdktn-construct-${repoName}`,
-          {
-            repositoryName: repoName,
-            team: githubTeam,
-            webhookUrl: slackWebhook.stringValue,
-            provider: githubProvider,
-            protectMain: true,
-            protectMainChecks,
-          },
-        );
+        if (createRepository && description === undefined) {
+          throw new Error(
+            `${repoName}: createRepository requires a description`,
+          );
+        }
+        if (!createRepository && description !== undefined) {
+          throw new Error(
+            `${repoName}: description is only applied with createRepository: true`,
+          );
+        }
+
+        const repoConfig = {
+          team: githubTeam,
+          webhookUrl: slackWebhook.stringValue,
+          provider: githubProvider,
+          protectMain: true,
+          protectMainChecks,
+        };
+        // GithubRepository names the repository after its construct id, so a
+        // created repo's id is the bare repo name.
+        const repo = createRepository
+          ? new GithubRepository(this, repoName, {
+              ...repoConfig,
+              description,
+              topics,
+            })
+          : new GithubRepositoryFromExistingRepository(
+              this,
+              `cdktn-construct-${repoName}`,
+              { ...repoConfig, repositoryName: repoName },
+            );
 
         // Deployment protection shared by every environment of a repo that
         // opted in: only refs of protected branches (i.e. `main`) may deploy.
@@ -660,6 +694,37 @@ new CustomConstructsStack(app, "custom-constructs", [
     // If the tag trigger that release.yml's header describes as future state
     // is ever added, this flag has to become a custom branch/tag policy --
     // "protected branches only" refuses a run whose ref is a tag.
+    protectedReleaseEnvironment: true,
+  },
+  {
+    name: "cdktn-bundlers",
+    // Unlike the two entries above, cdktn-bundlers does not exist yet, so this
+    // stack creates and owns it.
+    createRepository: true,
+    description:
+      "Monorepo of cdktn-team-maintained asset bundlers (IAssetBundler implementations) for CDK Terrain.",
+    languages: ["typescript", "python", "java", "csharp", "go"],
+    // Not a provider binding -- same topic treatment as cdktn-awscc/cdktn-aws.
+    topics: [
+      ...GithubRepository.defaultTopics.filter(
+        (topic) => topic !== "provider" && topic !== "pre-built-provider",
+      ),
+      "bundler",
+      "assets",
+    ],
+    goDescription:
+      "Go bindings for the @cdktn/bundler-* packages (cdktn asset bundlers)",
+    // The repository is born with only an initial commit, so there is no CI to
+    // read job names off yet, and the default per-language package-* contexts
+    // would not match a monorepo's per-package jobs. Require a single `build`
+    // context: the first pull request must add a pull_request-triggered job
+    // named `build` (with enforce_admins: true nothing merges until one
+    // reports). Grow this list once the repo's CI settles.
+    protectMainChecks: ["build"],
+    // Fresh repo, so its release workflow can be written to the protected
+    // shape from day one: publishing jobs declare `environment: release`, and
+    // the release trigger must be a branch (push to / dispatch on main) -- a
+    // tag-triggered release is rejected by the protected-branches policy.
     protectedReleaseEnvironment: true,
   },
 ]);
