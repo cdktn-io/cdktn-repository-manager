@@ -155,10 +155,9 @@ export class PublishingSecretSet extends Construct {
     // environment (see `SecretFromVariableOptions.releaseScoped`), and stay
     // repo-level everywhere else.
     //
-    // `npm-token` and `twine-*` are only read by publish jobs too, but are
-    // OIDC fallbacks rather than primary credentials: callers decide per repo
-    // whether to pass an environment for them (forTypescript / forPython),
-    // and most do not, which keeps them repo-level.
+    // `npm-token` and `twine-*` are OIDC fallbacks: most callers pass no
+    // environment for them (forTypescript / forPython), keeping them
+    // repo-level.
     //
     // Not in this set, deliberately: `gh-token` / `gh-app-*`, which projen's
     // non-release workflows (upgrade, auto-merge) read on every provider
