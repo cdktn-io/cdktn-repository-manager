@@ -289,14 +289,41 @@ jobs:
           # the `npx projen` on the line above rewrites package.json, so a frozen
           # install would fail with ERR_PNPM_OUTDATED_LOCKFILE. Explicit here too.
           pnpm install --no-frozen-lockfile
-          # Transitive-only lockfile refresh for GHSA-rgw5-rvv9-x895: every provider
-          # repo's committed lockfile still resolves brace-expansion to a flagged
-          # version (<1.1.18 / <2.1.4), and the build's `pnpm audit --audit-level high`
-          # gate fails on it. Neither `pnpm add` above nor projen's upgrade task
-          # touches transitives, so the refresh has to happen here for the upgrade
-          # PRs to be mergeable. No-ops (exit 0) once lockfiles resolve to patched
-          # versions everywhere -- remove it then.
-          pnpm update brace-expansion --depth Infinity
+          # Transitive-only lockfile refresh. `pnpm update` re-resolves only what it
+          # is named, and nothing above names transitives -- so a flagged transitive
+          # stays pinned while the build's audit gate fails on it, leaving the upgrade
+          # PR unmergeable. Derived from the audit rather than a hardcoded list, which
+          # is how undici GHSA-rfgv-xxqx-mfg5 reddened all 31 repos. Naming packages
+          # leaves package.json alone; a bare `pnpm update` rewrites declared ranges.
+          # Cooldown stays on per #60 -- minimumReleaseAgeExclude is the waiver.
+          #
+          # Validate the payload, not the exit status: audit exits non-zero both when
+          # it finds advisories and when it cannot reach the registry, and a crash
+          # yields empty stdout that jq happily reduces to "". Treating that as "clean"
+          # would push an upgrade PR with the flagged transitive still pinned, which is
+          # the exact failure this step exists to prevent. A clean audit still returns
+          # an empty advisories object, so its absence means the audit did not run.
+          # POSIX sh, not bash: this is a container job, so `run` defaults to sh and
+          # a here-string would not parse. Temp files keep it portable.
+          AUDIT_OUT=$(mktemp); AUDIT_ERR=$(mktemp)
+          pnpm audit --audit-level high --json >"$AUDIT_OUT" 2>"$AUDIT_ERR" || true
+          # The -s guard is load-bearing: `jq -e` exits 0 on empty input, so a crashed
+          # audit would otherwise sail through this check as if it were clean.
+          if [ ! -s "$AUDIT_OUT" ] || ! jq -e 'has("advisories")' "$AUDIT_OUT" >/dev/null 2>&1; then
+            echo "::error::pnpm audit returned no advisories object; refusing to open an upgrade PR that may still pin a flagged transitive"
+            cat "$AUDIT_ERR" >&2
+            rm -f "$AUDIT_OUT" "$AUDIT_ERR"
+            exit 1
+          fi
+          VULN=$(jq -r '[.advisories[]?.module_name] | unique | join(" ")' "$AUDIT_OUT")
+          rm -f "$AUDIT_OUT" "$AUDIT_ERR"
+          if [ -n "$VULN" ]; then
+            echo "refreshing flagged transitives: $VULN"
+            # Tolerated, and kept distinct from the audit failure above: the only patch
+            # may still be inside the cooldown, which must not abort the fleet upgrade.
+            pnpm update $VULN --depth Infinity --config.minimum-release-age=5760 \
+              || echo "::warning::could not refresh $VULN within the cooldown; lockfile unchanged"
+          fi
           # MUST be `pnpm run fetch`, never `pnpm fetch`: the latter is a pnpm builtin
           # that fetches from the lockfile, exits 0, and generates no bindings -- the
           # workflow would then find no diff and report success having done nothing.
