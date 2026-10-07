@@ -14,6 +14,7 @@ import {
   MigrateIds,
   S3BackendConfig,
   S3Backend,
+  Token,
 } from "cdktn";
 import {
   GitHubActionsRoleStack,
@@ -21,6 +22,7 @@ import {
   GithubRepositoryFromExistingRepository,
   SecretFromVariable,
   PublishingSecretSet,
+  DeploymentEnvironment,
 } from "./lib";
 import * as fs from "fs";
 import * as path from "path";
@@ -324,66 +326,88 @@ class CdkTerrainProviderStack extends TerraformStack {
   }
 }
 
+interface ReleaseEnvironmentOptions {
+  /**
+   * Requires a `team-cdk-terrain` member other than the person who triggered
+   * the run to approve it. Every release then needs a second team member.
+   */
+  readonly requireApproval?: boolean;
+  /**
+   * Also moves NPM_TOKEN into `release` and TWINE_* into `pypi`. They are
+   * OIDC fallbacks, kept because a package's first npm publish has to be
+   * token-based.
+   */
+  readonly scopeRegistryTokens?: boolean;
+}
+
+type CustomConstructRepo = {
+  name: string;
+  languages: ("typescript" | "python" | "csharp" | "java" | "go")[];
+  topics?: string[];
+  /**
+   * Description for the companion `<name>-go` repository, created only
+   * when `languages` includes "go". Defaults to a generic message.
+   */
+  goDescription?: string;
+  /**
+   * Overrides the derived `protectMain` required-status-check contexts.
+   *
+   * By default this is `["build", "package-<language>", ...]`, mirroring
+   * the per-language job names projen generates for provider repos. That
+   * default only holds for repos whose CI actually exposes a job per
+   * `languages` entry -- a hand-rolled workflow (no projen boilerplate)
+   * may expose only a single job. Required status checks that never
+   * report leave every PR permanently unmergeable (worse, with
+   * `enforce_admins: true` admins can't override), so verify the repo's
+   * actual `pull_request`-triggered workflow's job names before relying
+   * on the default here.
+   */
+  protectMainChecks?: string[];
+  /**
+   * Puts this repository's publishing behind a GitHub deployment
+   * environment. Opt-in, and only correct for repositories whose release
+   * workflow is dispatched from a *branch*.
+   *
+   * When set (`true`, or options):
+   * - a `release` environment is created, and both it and the `pypi`
+   *   environment are restricted to protected branches (i.e. `main`,
+   *   which `protectMain: true` protects);
+   * - the credentials only a release job reads (MAVEN_*, NUGET_API_KEY,
+   *   GO_GITHUB_TOKEN) become environment secrets of `release` instead
+   *   of repo-level Actions secrets, so a job that does not declare
+   *   `environment: release` cannot read them at all.
+   *
+   * This is the infrastructure half of the cdktn-aws PR #1 security
+   * review finding: with repo-level publishing secrets and no
+   * environment, anyone able to dispatch release.yml from an arbitrary
+   * branch runs attacker-controlled code with those credentials in
+   * scope.
+   *
+   * NOT enabled for cdktn-awscc, deliberately: its release.yml is
+   * triggered by `push: tags: ["v*"]`, and a "protected branches only"
+   * deployment policy rejects a run whose ref is a tag -- turning this
+   * on there would block every tag release. A repo that gains a tag
+   * trigger later needs a custom branch/tag policy instead of this flag.
+   */
+  protectedReleaseEnvironment?: boolean | ReleaseEnvironmentOptions;
+} & (
+  | {
+      /** Adopt an existing repository (read via a data source). */
+      createRepository?: false;
+      description?: never;
+    }
+  | {
+      /** Create the repository and own it in this stack. */
+      createRepository: true;
+      description: string;
+    }
+);
+
 class CustomConstructsStack extends TerraformStack {
   constructor(
     scope: Construct,
     name: string,
-    constructRepos: {
-      name: string;
-      languages: ("typescript" | "python" | "csharp" | "java" | "go")[];
-      topics?: string[];
-      /**
-       * Description for the companion `<name>-go` repository, created only
-       * when `languages` includes "go". Defaults to a generic message.
-       * (`GithubRepositoryFromExistingRepository` reads an existing repo via
-       * a data source, so there is no `description` field for the main repo
-       * itself -- GitHub already has whatever description it was created
-       * with.)
-       */
-      goDescription?: string;
-      /**
-       * Overrides the derived `protectMain` required-status-check contexts.
-       *
-       * By default this is `["build", "package-<language>", ...]`, mirroring
-       * the per-language job names projen generates for provider repos. That
-       * default only holds for repos whose CI actually exposes a job per
-       * `languages` entry -- a hand-rolled workflow (no projen boilerplate)
-       * may expose only a single job. Required status checks that never
-       * report leave every PR permanently unmergeable (worse, with
-       * `enforce_admins: true` admins can't override), so verify the repo's
-       * actual `pull_request`-triggered workflow's job names before relying
-       * on the default here.
-       */
-      protectMainChecks?: string[];
-      /**
-       * Puts this repository's publishing behind a GitHub deployment
-       * environment. Opt-in, and only correct for repositories whose release
-       * workflow is dispatched from a *branch*.
-       *
-       * When true:
-       * - a `release` environment is created, and both it and the `pypi`
-       *   environment are restricted to protected branches (i.e. `main`,
-       *   which `protectMain: true` protects) with `team-cdk-terrain` as
-       *   required reviewer;
-       * - the credentials only a release job reads (MAVEN_*, NUGET_API_KEY,
-       *   GO_GITHUB_TOKEN) become environment secrets of `release` instead
-       *   of repo-level Actions secrets, so a job that does not declare
-       *   `environment: release` cannot read them at all.
-       *
-       * This is the infrastructure half of the cdktn-aws PR #1 security
-       * review finding: with repo-level publishing secrets and no
-       * environment, anyone able to dispatch release.yml from an arbitrary
-       * branch runs attacker-controlled code with those credentials in
-       * scope.
-       *
-       * NOT enabled for cdktn-awscc, deliberately: its release.yml is
-       * triggered by `push: tags: ["v*"]`, and a "protected branches only"
-       * deployment policy rejects a run whose ref is a tag -- turning this
-       * on there would block every tag release. A repo that gains a tag
-       * trigger later needs a custom branch/tag policy instead of this flag.
-       */
-      protectedReleaseEnvironment?: boolean;
-    }[],
+    constructRepos: CustomConstructRepo[],
   ) {
     super(scope, name);
     const githubProvider = new GithubProvider(this, "github-provider-cdktf", {
@@ -413,10 +437,17 @@ class CustomConstructsStack extends TerraformStack {
         name: repoName,
         languages,
         topics,
+        createRepository = false,
+        description,
         goDescription,
         protectMainChecks: protectMainChecksOverride,
         protectedReleaseEnvironment = false,
       }) => {
+        const releaseOptions =
+          protectedReleaseEnvironment === true
+            ? {}
+            : protectedReleaseEnvironment || undefined;
+
         const protectMainChecks =
           protectMainChecksOverride ??
           ["build"].concat(
@@ -431,18 +462,25 @@ class CustomConstructsStack extends TerraformStack {
             }),
           );
 
-        const repo = new GithubRepositoryFromExistingRepository(
-          this,
-          `cdktn-construct-${repoName}`,
-          {
-            repositoryName: repoName,
-            team: githubTeam,
-            webhookUrl: slackWebhook.stringValue,
-            provider: githubProvider,
-            protectMain: true,
-            protectMainChecks,
-          },
-        );
+        const repoConfig = {
+          team: githubTeam,
+          webhookUrl: slackWebhook.stringValue,
+          provider: githubProvider,
+          protectMain: true,
+          protectMainChecks,
+        };
+        // GithubRepository uses its construct id as the repository name.
+        const repo = createRepository
+          ? new GithubRepository(this, repoName, {
+              ...repoConfig,
+              description,
+              topics,
+            })
+          : new GithubRepositoryFromExistingRepository(
+              this,
+              `cdktn-construct-${repoName}`,
+              { ...repoConfig, repositoryName: repoName },
+            );
 
         // Deployment protection shared by every environment of a repo that
         // opted in: only refs of protected branches (i.e. `main`) may deploy.
@@ -452,56 +490,74 @@ class CustomConstructsStack extends TerraformStack {
         // reviewers rule existed briefly on top of this and was dropped
         // (2026-09-02): with a small team the person dispatching the release
         // was the same person clicking approve, which is ceremony, not
-        // control. `canAdminsBypass: false` stays so the branch policy is
-        // not silently optional for admins.
-        const deploymentProtection = protectedReleaseEnvironment
+        // control. It is now opt-in per repo (`requireApproval`), paired with
+        // `preventSelfReview` so the approver is a second person.
+        // `canAdminsBypass: false` stays so the branch policy is not silently
+        // optional for admins.
+        const deploymentProtection = releaseOptions
           ? {
               deploymentBranchPolicy: {
                 protectedBranches: true,
                 customBranchPolicies: false,
               },
               canAdminsBypass: false,
+              ...(releaseOptions.requireApproval
+                ? {
+                    reviewers: {
+                      // github_repository_environment wants numeric team IDs;
+                      // data.github_team's id *is* the numeric ID, as a string.
+                      teams: [Token.asNumber(githubTeam.id)],
+                    },
+                    preventSelfReview: true,
+                  }
+                : {}),
             }
           : {};
+
+        const createEnvironment = (envName: string): DeploymentEnvironment => ({
+          name: envName,
+          resource: new RepositoryEnvironment(
+            this,
+            `${repoName}-${envName}-environment`,
+            {
+              environment: envName,
+              repository: repo.resource.name,
+              provider: githubProvider,
+              ...deploymentProtection,
+            },
+          ),
+        });
 
         // release.yml's publishing jobs run with `environment: release`; the
         // credentials they need live in this environment rather than on the
         // repository, so a job dispatched from another branch -- or a job
         // that just omits the environment -- cannot read them.
-        const releaseEnvironmentName = "release";
-        const releaseEnvironment = protectedReleaseEnvironment
-          ? {
-              name: releaseEnvironmentName,
-              resource: new RepositoryEnvironment(
-                this,
-                `${repoName}-${releaseEnvironmentName}-environment`,
-                {
-                  environment: releaseEnvironmentName,
-                  repository: repo.resource.name,
-                  provider: githubProvider,
-                  ...deploymentProtection,
-                },
-              ),
-            }
+        const releaseEnvironment = releaseOptions
+          ? createEnvironment("release")
           : undefined;
+        const registryTokenEnvironment = (
+          environment?: DeploymentEnvironment,
+        ) => (releaseOptions?.scopeRegistryTokens ? environment : undefined);
 
         secrets.forGitHub(repo.resource, githubProvider, releaseEnvironment);
         if (languages.includes("typescript")) {
-          secrets.forTypescript(repo.resource, githubProvider);
+          secrets.forTypescript(
+            repo.resource,
+            githubProvider,
+            registryTokenEnvironment(releaseEnvironment),
+          );
         }
         if (languages.includes("python")) {
-          secrets.forPython(repo.resource, githubProvider);
-
           // release.yml's release_pypi job runs with `environment: pypi`
           // (PyPI trusted publishing / OIDC) -- that job silently fails to
           // start on the first release unless the environment already
           // exists on the repo.
-          new RepositoryEnvironment(this, `${repoName}-pypi-environment`, {
-            environment: "pypi",
-            repository: repo.resource.name,
-            provider: githubProvider,
-            ...deploymentProtection,
-          });
+          const pypiEnvironment = createEnvironment("pypi");
+          secrets.forPython(
+            repo.resource,
+            githubProvider,
+            registryTokenEnvironment(pypiEnvironment),
+          );
         }
         if (languages.includes("csharp")) {
           secrets.forCsharp(repo.resource, githubProvider, releaseEnvironment);
@@ -661,6 +717,31 @@ new CustomConstructsStack(app, "custom-constructs", [
     // is ever added, this flag has to become a custom branch/tag policy --
     // "protected branches only" refuses a run whose ref is a tag.
     protectedReleaseEnvironment: true,
+  },
+  {
+    name: "cdktn-bundlers",
+    createRepository: true,
+    description:
+      "Monorepo of cdktn-team-maintained asset bundlers (IAssetBundler implementations) for CDK Terrain.",
+    languages: ["typescript", "python", "java", "csharp", "go"],
+    topics: [
+      ...GithubRepository.defaultTopics.filter(
+        (topic) => topic !== "provider" && topic !== "pre-built-provider",
+      ),
+      "bundler",
+      "assets",
+    ],
+    goDescription:
+      "Go bindings for the @cdktn/bundler-* packages (cdktn asset bundlers)",
+    // The repo starts empty, so the first PR must add a pull_request job named
+    // `build`. Add per-package contexts once its CI settles.
+    protectMainChecks: ["build"],
+    // Release workflows must run from main (not tags) and declare
+    // `environment: release` (or `pypi`) on publishing jobs.
+    protectedReleaseEnvironment: {
+      requireApproval: true,
+      scopeRegistryTokens: true,
+    },
   },
 ]);
 new GitHubActionsRoleStack(app, "github-actions-role",{
