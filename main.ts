@@ -733,9 +733,9 @@ new CustomConstructsStack(app, "custom-constructs", [
     ],
     goDescription:
       "Go bindings for the @cdktn/bundler-* packages (cdktn asset bundlers)",
-    // The repo starts empty, so the first PR must add a pull_request job named
-    // `build`. Add per-package contexts once its CI settles.
-    protectMainChecks: ["build"],
+    // `build` is ci.yml's only job. `Validate PR title` (pull-request-lint.yml)
+    // keeps squash commits conventional, which release-please versions from.
+    protectMainChecks: ["build", "Validate PR title"],
     // Release workflows must run from main (not tags) and declare
     // `environment: release` (or `pypi`) on publishing jobs.
     protectedReleaseEnvironment: {
