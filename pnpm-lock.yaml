@@ -27,8 +27,8 @@ importers:
         specifier: ^16.1.0
         version: 16.1.0(cdktn@0.25.0(constructs@10.7.2))(constructs@10.7.2)
       '@cdktn/provider-github':
-        specifier: ^18.0.0
-        version: 18.0.0(cdktn@0.25.0(constructs@10.7.2))(constructs@10.7.2)
+        specifier: ^19.0.0
+        version: 19.0.0(cdktn@0.25.0(constructs@10.7.2))(constructs@10.7.2)
       '@cdktn/provider-time':
         specifier: 14.0.0
         version: 14.0.0(cdktn@0.25.0(constructs@10.7.2))(constructs@10.7.2)
@@ -161,12 +161,12 @@ packages:
   '@cdktn/provider-generator@0.25.0':
     resolution: {integrity: sha512-vsfQt0WtVota9y4DFMF7F7HrD9n8EvJyjJ1B2480I8b23PJXTldNBvfWoy8tPYKPKxjMdrrNCwCdOufc0dGypQ==}
 
-  '@cdktn/provider-github@18.0.0':
-    resolution: {integrity: sha512-8RauZr/CnWqGa5aXey2ZglG6VkRFBTv5n10xrN0XADP/Rk5ez6gZducsp7jjAmNmaa/+aNE2pT7Am6j9oYzd5g==}
+  '@cdktn/provider-github@19.0.0':
+    resolution: {integrity: sha512-BXG6BAkb7wwQFEIs+aNAVqS/gg6NgOy6l+e/rHY8c7v4vZU14L+PAqp6/LNgY6XDO6thYv/uvMSvVb/Ikpmlmw==}
     engines: {node: '>= 22.11.0'}
     peerDependencies:
-      cdktn: ^0.24.0
-      constructs: '>=10.6.0 <10.8.0'
+      cdktn: ^0.25.0
+      constructs: ^10.6.0
 
   '@cdktn/provider-schema@0.25.0':
     resolution: {integrity: sha512-yfOr4JMQTM1odDrOs6q/+7MuXCwKSl8VsZ66UX8vAjm/Jg3zyEh99B2If8Ox6Mthu2kEuBfHqlEOJYO6O3jAIQ==}
@@ -2107,7 +2107,7 @@ snapshots:
       - jsii-rosetta
       - supports-color
 
-  '@cdktn/provider-github@18.0.0(cdktn@0.25.0(constructs@10.7.2))(constructs@10.7.2)':
+  '@cdktn/provider-github@19.0.0(cdktn@0.25.0(constructs@10.7.2))(constructs@10.7.2)':
     dependencies:
       cdktn: 0.25.0(constructs@10.7.2)
       constructs: 10.7.2

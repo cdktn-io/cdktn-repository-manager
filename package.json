@@ -36,7 +36,7 @@
     "@cdktn/provider-aws": "^25.4.0",
     "@cdktn/provider-cloudinit": "^14.0.0",
     "@cdktn/provider-docker": "^16.1.0",
-    "@cdktn/provider-github": "^18.0.0",
+    "@cdktn/provider-github": "^19.0.0",
     "@cdktn/provider-time": "14.0.0",
     "@cdktn/provider-tls": "^14.1.0",
     "cdktn": "^0.25.0",
