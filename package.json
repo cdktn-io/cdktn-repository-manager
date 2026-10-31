@@ -36,13 +36,13 @@
     "@cdktn/provider-aws": "^25.4.0",
     "@cdktn/provider-cloudinit": "^14.0.0",
     "@cdktn/provider-docker": "^16.1.0",
-    "@cdktn/provider-github": "^18.0.0",
+    "@cdktn/provider-github": "^19.0.0",
     "@cdktn/provider-time": "14.0.0",
     "@cdktn/provider-tls": "^14.1.0",
-    "cdktn": "^0.24.0",
-    "cdktn-cli": "^0.24.0",
+    "cdktn": "^0.25.0",
+    "cdktn-cli": "^0.25.0",
     "change-case": "~4.1.2",
-    "constructs": "^10.7.2",
+    "constructs": "^10.6.0",
     "terraconstructs": "0.2.15"
   },
   "devDependencies": {
