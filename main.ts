@@ -372,7 +372,7 @@ type CustomConstructRepo = {
    * - a `release` environment is created, and both it and the `pypi`
    *   environment are restricted to protected branches (i.e. `main`,
    *   which `protectMain: true` protects);
-   * - the credentials only a release job reads (MAVEN_*, NUGET_API_KEY,
+   * - the credentials only a release job reads (MAVEN_*, NUGET_*,
    *   GO_GITHUB_TOKEN) become environment secrets of `release` instead
    *   of repo-level Actions secrets, so a job that does not declare
    *   `environment: release` cannot read them at all.
