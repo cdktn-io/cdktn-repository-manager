@@ -167,6 +167,7 @@ export class PublishingSecretSet extends Construct {
       "twine-username",
       "twine-password",
       "nuget-api-key",
+      "nuget-username",
       "maven-username",
       "maven-password",
       "maven-gpg-private-key",
@@ -181,6 +182,7 @@ export class PublishingSecretSet extends Construct {
       "twine-username",
       "twine-password",
       "nuget-api-key",
+      "nuget-username",
       "maven-username", // Set up Maven Central and store credentials in BitWarden
       "maven-password", // Use the user token password (same as above)
       "maven-gpg-private-key",
